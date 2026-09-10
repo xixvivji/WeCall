@@ -1,7 +1,7 @@
 # WeCall B2B
 
 식품 유통사의 회수 요청 분석·영향 추적·대응 관리 서비스.
-PostgreSQL 기반 CSV 등록, 회수 사건·조건 등록·승인, 대상 판정과 영향 조회를 구현했습니다. AI 모델 연결과 증거 보완·작업 관리는 아직 구현하지 않았습니다.
+PostgreSQL 기반 CSV 등록, 회수 사건·조건 등록·승인, 대상 판정과 영향 조회를 구현했습니다. 입고 증거 텍스트 등록·승인·누락값 보완·재판정까지 구현했습니다. AI/OCR 연결과 작업 관리는 아직 구현하지 않았습니다.
 
 ## 프로젝트 문서
 
@@ -25,6 +25,7 @@ Spring Boot는 업무 로직·조건 판정·승인·데이터 저장을 맡고,
 
 - [논리 ERD 초안](docs/design/erd.md)
 - [회수 사건·조건 승인·판정 API](docs/design/recall-api.md)
+- [입고 증거 보완·재판정 API](docs/design/evidence-api.md)
 - [합성 회수 사건·CSV·정답표](samples/recall-001/README.md)
 - 샘플 검증: `python3 scripts/validate_sample.py`
 
@@ -60,7 +61,7 @@ uv가 필요한 Python 3.12 환경을 준비합니다. 최초 실행 시 인터�
 
 ## 회수 흐름 시연
 
-백엔드 실행 후 별도 터미널의 저장소 루트에서 `python3 scripts/demo_recall.py`를 실행하면 합성 사건을 새로 등록·승인·판정하고 정답 합계를 검사합니다.
+백엔드 실행 후 별도 터미널의 저장소 루트에서 `python3 scripts/demo_recall.py`를 실행하면 합성 사건을 새로 등록·승인·판정하고 정답 합계를 검사합니다. 증거 승인 전후까지 확인하려면 `python3 scripts/demo_recall.py --with-evidence`를 사용합니다.
 
 ## 검증
 

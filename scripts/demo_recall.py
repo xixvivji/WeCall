@@ -15,6 +15,7 @@ SAMPLE = Path(__file__).resolve().parents[1] / "samples" / "recall-001"
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:8080")
+    parser.add_argument("--with-evidence", action="store_true", help="Approve synthetic receipt evidence and verify after results")
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
 
@@ -52,9 +53,35 @@ def main():
         expected = dict(zip(("target", "nonTarget", "needsReview"), (golden[section][s] for s in ("TARGET", "NON_TARGET", "NEEDS_REVIEW"))))
         if result[key] != expected:
             raise SystemExit(f"Golden mismatch: {key}")
-    print(json.dumps({"datasetId": dataset["datasetId"], "caseId": case["id"], "conditionId": condition["id"], "assessmentId": result["id"],
-                      "inventoryTotals": result["inventoryTotals"], "shipmentTotals": result["shipmentTotals"],
-                      "resultUrl": base + prefix + f'/assessments/{result["id"]}'}, ensure_ascii=False, indent=2))
+    output = {"datasetId": dataset["datasetId"], "caseId": case["id"], "conditionId": condition["id"], "assessmentId": result["id"],
+              "inventoryTotals": result["inventoryTotals"], "shipmentTotals": result["shipmentTotals"],
+              "resultUrl": base + prefix + f'/assessments/{result["id"]}'}
+    if args.with_evidence:
+        proposal = json.loads((SAMPLE / "evidence-request.json").read_text())
+        proposal["baseAssessmentId"] = result["id"]
+        proposal["documentText"] = (SAMPLE / "receipt-evidence.md").read_text()
+        evidence = request(prefix + "/evidence", proposal)
+        if evidence["issues"]:
+            raise SystemExit(f"Unexpected evidence issues: {evidence['issues']}")
+        approved = request(prefix + f'/evidence/{evidence["id"]}/approval', {
+            "reviewer": "demo-reviewer", "note": "합성 명세서의 R4 입고와 전체 40 EA 단일 제조분 확인",
+            "receiptAndSingleLotConfirmed": True})
+        after = request(prefix + f'/assessments/{approved["resultAssessmentId"]}')
+        after_golden = json.loads((SAMPLE / "expected_summary.json").read_text())["after"]
+        for section, key in (("inventory", "inventoryTotals"), ("shipments", "shipmentTotals")):
+            expected = dict(zip(("target", "nonTarget", "needsReview"), (after_golden[section][state] for state in ("TARGET", "NON_TARGET", "NEEDS_REVIEW"))))
+            if after[key] != expected:
+                raise SystemExit(f"After golden mismatch: {key}")
+        if request(prefix + f'/assessments/{result["id"]}') != result:
+            raise SystemExit("Original assessment changed")
+        s2 = next(shipment for shipment in after["shipments"] if shipment["shipmentId"] == "S2")
+        if s2["unlinked"] != 10 or s2["needsReview"] != 10:
+            raise SystemExit("Unlinked shipment was incorrectly resolved")
+        output["evidence"] = {"id": evidence["id"], "status": approved["status"],
+                              "resultDatasetId": approved["resultDatasetId"], "resultAssessmentId": after["id"],
+                              "inventoryTotals": after["inventoryTotals"], "shipmentTotals": after["shipmentTotals"],
+                              "unlinkedS2": s2["unlinked"]}
+    print(json.dumps(output, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

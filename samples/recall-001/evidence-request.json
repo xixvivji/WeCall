@@ -1,0 +1,11 @@
+{
+  "baseAssessmentId": "00000000-0000-0000-0000-000000000000",
+  "receiptId": "R4",
+  "documentText": "입고 건 R4 / 입고일 2026-09-04 / 상품 P1 별빛 크래커 오리지널 100g / 제조사 가상식품A / 수량 40 EA / 제조번호 A02 / 소비기한 2026-10-31.",
+  "sourceQuote": "입고 건 R4 / 입고일 2026-09-04 / 상품 P1 별빛 크래커 오리지널 100g / 제조사 가상식품A / 수량 40 EA / 제조번호 A02 / 소비기한 2026-10-31.",
+  "observedProductId": "P1",
+  "observedReceivedQuantity": 40,
+  "observedReceivedAt": "2026-09-04",
+  "lotNumber": "A02",
+  "expiryDate": "2026-10-31"
+}

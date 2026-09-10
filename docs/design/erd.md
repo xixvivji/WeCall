@@ -62,4 +62,4 @@ erDiagram
 
 ## 다음 구현 범위
 
-CSV 검증·등록과 입력 스키마에 이어 사건·조건 버전·승인·판정 실행·영향 조회를 구현했다. V2는 recall_case, recall_condition, assessment_run을 추가하며 개별 판정은 assessment_run.result JSONB에 보존한다. 논리 모델의 상품 검토는 조건 정의에 포함한다. 다음은 추가 증거 보완·작업 관리다. 인증과 승인 권한은 실제 사용자 데이터 적용 전에 구현한다.
+CSV 검증·등록과 입력 스키마에 이어 사건·조건 버전·승인·판정 실행·영향 조회를 구현했다. V2는 recall_case, recall_condition, assessment_run을 추가하며 개별 판정은 assessment_run.result JSONB에 보존한다. 논리 모델의 상품 검토는 조건 정의에 포함한다. V3의 receipt_evidence는 입고 텍스트·제안값·검토 이력·기준/결과 판정을 보존한다. 보완 승인은 전체 데이터 스냅샷 복제와 재판정으로 구현했으며 별도 RECEIPT_CORRECTION 테이블은 아직 없다. 다음은 대응 작업 관리다. 인증과 승인 권한은 실제 사용자 데이터 적용 전에 구현한다.
