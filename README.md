@@ -8,6 +8,10 @@ PostgreSQL 기반 CSV 등록, 회수 사건·조건 등록·승인, 대상 판�
 - [프로젝트 개요와 개발 순서](docs/overview.md)
 - [통합 기획안 원문 (2026-09-09)](docs/product-plan-2026-09-09.md)
 
+## 협업 규칙
+
+[Git Flow·커밋 메시지 규칙](CONTRIBUTING.md)을 따릅니다. 개발 통합 브랜치는 `develop`, 커밋 형식은 `feat : 한글 내용`입니다.
+
 ## 구성
 
 - `backend/`: Java 21, Spring Boot 3.5.16, Gradle Wrapper 8.7
