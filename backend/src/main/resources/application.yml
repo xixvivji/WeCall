@@ -1,7 +1,16 @@
 spring:
   application:
     name: wecall-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/wecall}
+    username: ${DB_USERNAME:wecall}
+    password: ${DB_PASSWORD:wecall-local-only}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 26MB
 server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8080}
 management:
   endpoints:

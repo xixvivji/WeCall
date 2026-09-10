@@ -1,7 +1,7 @@
 # WeCall B2B
 
 식품 유통사의 회수 요청 분석·영향 추적·대응 관리 서비스.
-현재는 서버 실행과 상태 확인이 가능한 기초 프로젝트입니다. 업무 기능과 AI 모델 연결은 아직 구현하지 않았습니다.
+현재는 PostgreSQL 기반 CSV 검증·등록 API와 서버 상태 확인을 구현했습니다. 회수 판정과 AI 모델 연결은 아직 구현하지 않았습니다.
 
 ## 프로젝트 문서
 
@@ -12,7 +12,8 @@
 
 - `backend/`: Java 21, Spring Boot 3.5.16, Gradle Wrapper 8.7
 - `ai/`: Python 3.12, FastAPI, uv (의존성 버전은 uv.lock으로 고정)
-- 프론트엔드, DB, AI 모델, 저장소, 배포 환경: 추후 결정
+- DB: PostgreSQL 17.6 · Flyway · Spring JDBC
+- 프론트엔드, AI 모델, 파일 저장소, 배포 환경: 추후 결정
 
 Spring Boot는 업무 로직·조건 판정·승인·데이터 저장을 맡고, FastAPI는 문서 해석·조건 추출·상품 후보 비교를 담당할 예정입니다. 두 서버 간 호출은 아직 연결하지 않았습니다.
 
@@ -22,15 +23,16 @@ Spring Boot는 업무 로직·조건 판정·승인·데이터 저장을 맡고,
 - [합성 회수 사건·CSV·정답표](samples/recall-001/README.md)
 - 샘플 검증: `python3 scripts/validate_sample.py`
 
-DB와 업무 API는 아직 구현 전이며, 설계·정답표를 개발 기준으로 추가했습니다.
+[CSV 등록 API·DB 실행 가이드](docs/design/csv-import.md)에 요청 예시와 입력 제약을 정리했습니다.
 
 ## 로컬 실행
 
-Java 21과 uv가 필요합니다. Gradle은 별도 설치하지 않아도 됩니다.
+Java 21, Docker와 uv가 필요합니다. Gradle은 별도 설치하지 않아도 됩니다.
 
 ### 백엔드
 
 ```sh
+docker compose up -d postgres
 cd backend
 ./gradlew bootRun
 ```
