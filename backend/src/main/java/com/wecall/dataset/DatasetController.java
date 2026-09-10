@@ -29,7 +29,7 @@ public class DatasetController {
     }
 }
 
-@RestControllerAdvice
+@RestControllerAdvice(assignableTypes = DatasetController.class)
 class DatasetErrors {
     @ExceptionHandler(DatasetService.InvalidDataset.class)
     ResponseEntity<?> invalid(DatasetService.InvalidDataset e) {

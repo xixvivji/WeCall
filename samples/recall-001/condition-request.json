@@ -1,0 +1,16 @@
+{
+  "datasetId": "00000000-0000-0000-0000-000000000000",
+  "sourceQuote": "제조번호 A01 또는 A02이면서 소비기한이 2026-10-31인 제품",
+  "productReviews": {
+    "P1": {"status": "MATCHED", "reason": "제조사 가상식품A와 규격 100g 일치"},
+    "P2": {"status": "EXCLUDED", "reason": "규격 200g으로 다름"},
+    "P3": {"status": "EXCLUDED", "reason": "제조사 가상식품B로 다름"}
+  },
+  "rule": {
+    "op": "AND",
+    "children": [
+      {"op": "IN", "field": "LOT_NUMBER", "values": ["A01", "A02"]},
+      {"op": "EQ", "field": "EXPIRY_DATE", "values": ["2026-10-31"]}
+    ]
+  }
+}

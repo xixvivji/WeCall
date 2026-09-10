@@ -1,0 +1,61 @@
+"""Create a fresh synthetic dataset/case and run the approved demo workflow.
+
+Requires an already-running local backend. No real reviewer authentication is implied.
+"""
+import argparse
+import json
+from pathlib import Path
+import urllib.error
+import urllib.request
+import uuid
+
+SAMPLE = Path(__file__).resolve().parents[1] / "samples" / "recall-001"
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base-url", default="http://127.0.0.1:8080")
+    args = parser.parse_args()
+    base = args.base_url.rstrip("/")
+
+    def request(path, body=None, content_type="application/json"):
+        if isinstance(body, dict):
+            body = json.dumps(body, ensure_ascii=False).encode()
+        req = urllib.request.Request(base + path, data=body, headers={"Content-Type": content_type})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as exc:
+            raise SystemExit(f"HTTP {exc.code}: {exc.read().decode()}") from exc
+
+    boundary = "wecall-" + uuid.uuid4().hex
+    parts = []
+    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="asOf"\r\n\r\n2026-09-09T18:00:00+09:00\r\n'.encode())
+    for name in ("products", "receipts", "inventory", "shipments", "shipment_allocations"):
+        field = "shipmentAllocations" if name == "shipment_allocations" else name
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="{name}.csv"\r\nContent-Type: text/csv\r\n\r\n'.encode())
+        parts.extend([(SAMPLE / f"{name}.csv").read_bytes(), b"\r\n"])
+    parts.append(f"--{boundary}--\r\n".encode())
+    dataset = request("/api/v1/datasets", b"".join(parts), f"multipart/form-data; boundary={boundary}")
+    case = request("/api/v1/recalls", {"title": "가상 별빛 크래커 회수", "sourceType": "SUPPLIER", "sourceText": (SAMPLE / "notice.md").read_text()})
+    prefix = f'/api/v1/recalls/{case["id"]}'
+    definition = json.loads((SAMPLE / "condition-request.json").read_text())
+    definition["datasetId"] = dataset["datasetId"]
+    condition = request(prefix + "/conditions", definition)
+    request(prefix + f'/conditions/{condition["id"]}/approval', {"reviewer": "demo-reviewer"})
+    result = request(prefix + "/assessments", {"conditionId": condition["id"]})
+    stored = request(prefix + f'/assessments/{result["id"]}')
+    if stored != result:
+        raise SystemExit("Stored assessment differs from response")
+    golden = json.loads((SAMPLE / "expected_summary.json").read_text())["before"]
+    for section, key in (("inventory", "inventoryTotals"), ("shipments", "shipmentTotals")):
+        expected = dict(zip(("target", "nonTarget", "needsReview"), (golden[section][s] for s in ("TARGET", "NON_TARGET", "NEEDS_REVIEW"))))
+        if result[key] != expected:
+            raise SystemExit(f"Golden mismatch: {key}")
+    print(json.dumps({"datasetId": dataset["datasetId"], "caseId": case["id"], "conditionId": condition["id"], "assessmentId": result["id"],
+                      "inventoryTotals": result["inventoryTotals"], "shipmentTotals": result["shipmentTotals"],
+                      "resultUrl": base + prefix + f'/assessments/{result["id"]}'}, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

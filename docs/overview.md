@@ -31,7 +31,8 @@
 | AI 서버 | Python 3.12 · FastAPI · uv 기초 구성 완료 |
 | 검증 | 서버별 상태 API 테스트, 백엔드 빌드 확인 |
 | DB·등록 API | PostgreSQL · Flyway · JDBC, CSV 5종 일괄 검증·등록 구현 |
-| 미구현 | 회수 판정 API, 인증·권한, AI 분석, 서버 간 호출 |
+| 회수 API | 사건·조건 버전 등록·수동 승인, 대상 판정·영향 결과 보존 구현 |
+| 미구현 | 인증·권한, 증거 보완·작업·종료, AI 분석, 서버 간 호출 |
 | 미결정 | 프론트, AI 모델·OCR·임베딩, 저장소, 배포 환경 |
 
 Spring Boot가 업무 데이터와 승인을 관리하고 FastAPI가 AI 분석 결과·근거를 반환하는 구조를 계획한다.
@@ -52,4 +53,4 @@ Spring Boot가 업무 데이터와 승인을 관리하고 FastAPI가 AI 분석 �
 
 ## 2026-09-10 설계 산출물
 
-[논리 ERD 초안](design/erd.md)과 [합성 사건·정답표](../samples/recall-001/README.md)를 작성했다. 입력 5종 CSV와 증거 승인 전후 정답을 포함하며, 참조·수량 검증 스크립트를 추가했다. 이후 PostgreSQL CSV 등록 API를 구현했다. 판정 엔진은 아직 구현 전이다.
+[논리 ERD 초안](design/erd.md)과 [합성 사건·정답표](../samples/recall-001/README.md)를 작성했다. 입력 5종 CSV와 증거 승인 전후 정답을 포함하며, 참조·수량 검증 스크립트를 추가했다. 이후 PostgreSQL CSV 등록 API를 구현했다. 이어서 제한된 조건 판정 엔진과 사건·승인·영향 조회 API를 구현했다.
