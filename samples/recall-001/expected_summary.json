@@ -1,0 +1,26 @@
+{
+  "before": {
+    "inventory": {
+      "TARGET": 110,
+      "NON_TARGET": 110,
+      "NEEDS_REVIEW": 30
+    },
+    "shipments": {
+      "TARGET": 60,
+      "NON_TARGET": 10,
+      "NEEDS_REVIEW": 20
+    }
+  },
+  "after": {
+    "inventory": {
+      "TARGET": 140,
+      "NON_TARGET": 110,
+      "NEEDS_REVIEW": 0
+    },
+    "shipments": {
+      "TARGET": 70,
+      "NON_TARGET": 10,
+      "NEEDS_REVIEW": 10
+    }
+  }
+}

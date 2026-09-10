@@ -1,0 +1,5 @@
+shipment_id,before_target,before_non_target,before_needs_review,after_target,after_non_target,after_needs_review
+S1,40,0,0,40,0,0
+S2,20,0,10,20,0,10
+S3,0,10,0,0,10,0
+S4,0,0,10,10,0,0

@@ -1,0 +1,8 @@
+receipt_id,before,after,reason
+R1,TARGET,TARGET,제조번호와 소비기한 일치
+R2,TARGET,TARGET,제조번호와 소비기한 일치
+R3,NON_TARGET,NON_TARGET,제조번호 불일치
+R4,NEEDS_REVIEW,TARGET,제조번호 누락; 입고 증거 승인 후 A02로 보완
+R5,NON_TARGET,NON_TARGET,소비기한 불일치
+R6,NON_TARGET,NON_TARGET,규격이 다른 상품
+R7,NON_TARGET,NON_TARGET,제조사가 다른 상품

@@ -1,0 +1,5 @@
+allocation_id,shipment_id,receipt_id,quantity
+A1,S1,R1,40
+A2,S2,R2,20
+A3,S3,R3,10
+A4,S4,R4,10

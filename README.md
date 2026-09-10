@@ -16,6 +16,14 @@
 
 Spring Boot는 업무 로직·조건 판정·승인·데이터 저장을 맡고, FastAPI는 문서 해석·조건 추출·상품 후보 비교를 담당할 예정입니다. 두 서버 간 호출은 아직 연결하지 않았습니다.
 
+## 설계·샘플 데이터
+
+- [논리 ERD 초안](docs/design/erd.md)
+- [합성 회수 사건·CSV·정답표](samples/recall-001/README.md)
+- 샘플 검증: `python3 scripts/validate_sample.py`
+
+DB와 업무 API는 아직 구현 전이며, 설계·정답표를 개발 기준으로 추가했습니다.
+
 ## 로컬 실행
 
 Java 21과 uv가 필요합니다. Gradle은 별도 설치하지 않아도 됩니다.

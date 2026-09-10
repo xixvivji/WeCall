@@ -1,0 +1,8 @@
+inventory_id,receipt_id,warehouse,quantity,hold_status
+I1,R1,WH1,60,NONE
+I2,R2,WH1,50,NONE
+I3,R3,WH1,40,NONE
+I4,R4,WH1,30,NONE
+I5,R5,WH1,30,NONE
+I6,R6,WH1,20,NONE
+I7,R7,WH1,20,NONE
