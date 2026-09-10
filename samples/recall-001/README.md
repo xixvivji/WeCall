@@ -22,3 +22,5 @@ S4는 R4에 실제 연결되어 있으므로 R4 판정이 바뀌면 영향 수�
 CSV는 UTF-8, 첫 행 헤더, 날짜 YYYY-MM-DD, 빈 제조번호는 unknown이다. ID는 파일 내 유일하며 참조 ID는 존재해야 한다. 원본 파일은 수정하지 않는다. 이 샘플은 전체 업로드 계약이나 실제 OCR 성능 평가 자료가 아니다.
 
 저장소 루트에서 `python3 scripts/validate_sample.py`로 참조·수량·정답표 일관성을 검사한다. 이 검사는 향후 Java 판정 엔진의 정확성 검증을 대신하지 않는다.
+
+백엔드 실행 후 `python3 scripts/demo_recall.py --with-evidence`로 등록부터 증거 승인 후 재판정까지 시연할 수 있다. `evidence-request.json`의 baseAssessmentId는 실제 기존 판정 ID로 대체한다. PDF/OCR 시연이 아닌 텍스트 증거·수동 제안 검토다.
