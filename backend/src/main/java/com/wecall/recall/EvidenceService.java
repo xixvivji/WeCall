@@ -18,8 +18,9 @@ public class EvidenceService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final RecallService recalls;
-    public EvidenceService(JdbcTemplate jdbc,ObjectMapper json,RecallService recalls) {
-        this.jdbc=jdbc; this.json=json; this.recalls=recalls;
+    private final CaseGuard guard;
+    public EvidenceService(JdbcTemplate jdbc,ObjectMapper json,RecallService recalls,CaseGuard guard) {
+        this.jdbc=jdbc; this.json=json; this.recalls=recalls; this.guard=guard;
     }
     public static class Blocked extends RuntimeException {
         public final List<Issue> issues;
@@ -71,6 +72,7 @@ public class EvidenceService {
     }
     @Transactional
     public Map<String,Object> create(UUID caseId,NewEvidence p) {
+        guard.requireOpen(caseId);
         require(p.lotNumber()!=null || p.expiryDate()!=null,HttpStatus.BAD_REQUEST,"제조번호 또는 소비기한 보완값이 필요합니다");
         require(p.lotNumber()==null || (!p.lotNumber().isBlank() && p.lotNumber().equals(p.lotNumber().trim())),HttpStatus.BAD_REQUEST,"제조번호는 공백 없이 입력하세요");
         Assessment base=recalls.getAssessment(caseId,p.baseAssessmentId());
@@ -96,6 +98,7 @@ public class EvidenceService {
     }
     @Transactional
     public Map<String,Object> approve(UUID caseId,UUID id,ApproveEvidence approval) {
+        guard.requireOpen(caseId);
         // Same lock order as condition version creation. The evidence lock prevents double application.
         recalls.getCase(caseId);
         jdbc.queryForList("SELECT id FROM recall_case WHERE id=? FOR UPDATE",caseId);
@@ -119,6 +122,7 @@ public class EvidenceService {
     }
     @Transactional
     public Map<String,Object> reject(UUID caseId,UUID id,RejectEvidence review) {
+        guard.requireOpen(caseId);
         var row=evidence(caseId,id,true);
         require(row.get("status").equals("PENDING"),HttpStatus.CONFLICT,"이미 검토한 증거입니다");
         jdbc.update("UPDATE receipt_evidence SET status='REJECTED',reviewed_by=?,review_note=?,reviewed_at=now() WHERE id=?",review.reviewer(),review.note(),id);

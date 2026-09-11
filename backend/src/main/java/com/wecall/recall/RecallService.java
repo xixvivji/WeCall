@@ -14,7 +14,8 @@ import static com.wecall.recall.RecallModels.*;
 public class RecallService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
-    public RecallService(JdbcTemplate jdbc, ObjectMapper json) { this.jdbc=jdbc; this.json=json; }
+    private final CaseGuard guard;
+    public RecallService(JdbcTemplate jdbc, ObjectMapper json, CaseGuard guard) { this.jdbc=jdbc; this.json=json; this.guard=guard; }
     public static class Failure extends RuntimeException {
         public final HttpStatus status;
         public Failure(HttpStatus status, String message) { super(message); this.status=status; }
@@ -43,11 +44,15 @@ public class RecallService {
     }
     public Map<String,Object> getCase(UUID id) {
         var row=one("SELECT * FROM recall_case WHERE id=?",id);
-        return Map.of("id",id,"title",row.get("title"),"sourceType",row.get("source_type"),"sourceText",row.get("source_text"),
-            "createdAt",row.get("created_at").toString(),"conditions",jdbc.queryForList("SELECT id,version,status FROM recall_condition WHERE case_id=? ORDER BY version",id));
+        Map<String,Object> result=new LinkedHashMap<>(Map.of("id",id,"title",row.get("title"),"sourceType",row.get("source_type"),"sourceText",row.get("source_text"),
+            "createdAt",row.get("created_at").toString(),"conditions",jdbc.queryForList("SELECT id,version,status FROM recall_condition WHERE case_id=? ORDER BY version",id)));
+        result.put("status",row.get("status")); result.put("lifecycleVersion",row.get("lifecycle_version"));
+        result.put("closedAt",row.get("closed_at")==null?null:row.get("closed_at").toString());
+        return result;
     }
     @Transactional
     public Map<String,Object> createCondition(UUID caseId, NewCondition request) {
+        guard.requireOpen(caseId);
         // Serialize version allocation within the case; definitions are insert-only.
         var recall=one("SELECT * FROM recall_case WHERE id=? FOR UPDATE",caseId);
         ensure(jdbc.queryForObject("SELECT count(*) FROM dataset WHERE id=?",Long.class,request.datasetId())==1,
@@ -77,6 +82,7 @@ public class RecallService {
     }
     @Transactional
     public Map<String,Object> approve(UUID caseId, UUID conditionId, Approval request) {
+        guard.requireOpen(caseId);
         var row=one("SELECT * FROM recall_condition WHERE case_id=? AND id=? FOR UPDATE",caseId,conditionId);
         ensure(row.get("status").equals("DRAFT"),HttpStatus.CONFLICT,"이미 승인된 조건입니다. 변경은 새 조건 버전을 생성하세요");
         jdbc.update("UPDATE recall_condition SET status='APPROVED',approved_by=?,approved_at=now() WHERE id=?",request.reviewer(),conditionId);
@@ -84,6 +90,7 @@ public class RecallService {
     }
     @Transactional
     public Assessment assess(UUID caseId, UUID conditionId) {
+        guard.requireOpen(caseId);
         var condition=one("SELECT * FROM recall_condition WHERE case_id=? AND id=?",caseId,conditionId);
         ensure(condition.get("status").equals("APPROVED"),HttpStatus.CONFLICT,"조건 승인 후 판정할 수 있습니다");
         NewCondition definition=decode(condition.get("definition"),NewCondition.class);

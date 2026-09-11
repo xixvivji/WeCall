@@ -16,7 +16,8 @@ public class TaskService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final RecallService recalls;
-    public TaskService(JdbcTemplate jdbc,ObjectMapper json,RecallService recalls) { this.jdbc=jdbc; this.json=json; this.recalls=recalls; }
+    private final CaseGuard guard;
+    public TaskService(JdbcTemplate jdbc,ObjectMapper json,RecallService recalls,CaseGuard guard) { this.jdbc=jdbc; this.json=json; this.recalls=recalls; this.guard=guard; }
     private void require(boolean valid,HttpStatus status,String message) {
         if (!valid) throw new RecallService.Failure(status,message);
     }
@@ -34,6 +35,7 @@ public class TaskService {
         return rows.getFirst();
     }
     private Map<String,Object> locked(UUID caseId,UUID id,long version) {
+        guard.requireOpen(caseId);
         var row=task(caseId,id,true);
         require(((Number)row.get("version")).longValue()==version,HttpStatus.CONFLICT,"작업이 변경되었습니다. 최신 version으로 다시 요청하세요");
         return row;
@@ -50,6 +52,7 @@ public class TaskService {
     }
     @Transactional
     public Map<String,Object> create(UUID caseId,NewTask body) {
+        guard.requireOpen(caseId);
         recalls.getCase(caseId);
         require(body.assignee()==null || !body.assignee().isBlank(),HttpStatus.BAD_REQUEST,"담당자를 생략하거나 유효한 이름을 입력하세요");
         if (body.targetType()==TargetType.CASE) {
@@ -146,7 +149,7 @@ public class TaskService {
     @Transactional
     public Map<String,Object> reviewProof(UUID caseId,UUID id,UUID proofId,ProofReview body) {
         var row=locked(caseId,id,body.expectedVersion());
-        require(row.get("status").equals("IN_PROGRESS"),HttpStatus.CONFLICT,"진행 중인 작업의 증빙만 검토할 수 있습니다");
+        require(Set.of("IN_PROGRESS","CANCELLED").contains(row.get("status")),HttpStatus.CONFLICT,"진행 중 또는 취소된 작업의 미검토 증빙만 검토할 수 있습니다");
         var proofs=jdbc.queryForList("SELECT * FROM response_task_proof WHERE id=? AND task_id=? AND review_round=?",proofId,id,row.get("review_round"));
         require(!proofs.isEmpty(),HttpStatus.NOT_FOUND,"현재 처리 회차의 증빙이 없습니다");
         require(proofs.getFirst().get("status").equals("PENDING"),HttpStatus.CONFLICT,"이미 검토된 증빙입니다");
