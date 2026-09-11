@@ -103,6 +103,18 @@ public class TaskService {
         },caseId);
     }
     @Transactional
+    public Map<String,Object> transitionAssigned(UUID caseId,UUID id,Transition body) {
+        var row=locked(caseId,id,body.expectedVersion());
+        require(Objects.equals(row.get("assignee"),body.actor()) && body.action()==Action.START,HttpStatus.FORBIDDEN,"실행 담당자는 자신에게 배정된 작업만 시작할 수 있습니다");
+        return transition(caseId,id,body);
+    }
+    @Transactional
+    public Map<String,Object> addAssignedProof(UUID caseId,UUID id,NewProof body) {
+        var row=locked(caseId,id,body.expectedVersion());
+        require(Objects.equals(row.get("assignee"),body.actor()),HttpStatus.FORBIDDEN,"자신에게 배정된 작업에만 증빙을 등록할 수 있습니다");
+        return addProof(caseId,id,body);
+    }
+    @Transactional
     public Map<String,Object> assign(UUID caseId,UUID id,Assignment body) {
         var row=locked(caseId,id,body.expectedVersion()); active(row);
         jdbc.update("UPDATE response_task SET assignee=? WHERE id=?",body.assignee(),id);

@@ -17,7 +17,7 @@ public final class RecallModels {
     public record NewCondition(@NotNull UUID datasetId, @NotNull Rule rule,
                                @NotEmpty @Size(max=1000) Map<@NotBlank String, @NotNull @Valid ProductReview> productReviews,
                                @NotBlank @Size(max=10000) String sourceQuote) {}
-    public record Approval(@NotBlank @Size(max=200) String reviewer) {}
+    public record Approval(@Pattern(regexp="(?s).*\\S.*") @Size(max=200) String reviewer) {}
     public record NewAssessment(@NotNull UUID conditionId) {}
     public record ReceiptDecision(String receiptId, String productId, Decision decision, String reason) {}
     public record InventoryImpact(String inventoryId, String receiptId, String warehouse, long quantity,

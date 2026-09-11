@@ -1,6 +1,7 @@
 package com.wecall.recall;
 
 import jakarta.validation.Valid;
+import com.wecall.auth.CurrentActor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
@@ -20,7 +21,7 @@ public class RecallController {
     @GetMapping("/{caseId}/conditions/{conditionId}")
     public Map<String,Object> getCondition(@PathVariable UUID caseId,@PathVariable UUID conditionId) { return service.getCondition(caseId,conditionId); }
     @PostMapping("/{caseId}/conditions/{conditionId}/approval")
-    public Map<String,Object> approve(@PathVariable UUID caseId,@PathVariable UUID conditionId,@Valid @RequestBody Approval body) { return service.approve(caseId,conditionId,body); }
+    public Map<String,Object> approve(@PathVariable UUID caseId,@PathVariable UUID conditionId,@Valid @RequestBody Approval body) { return service.approve(caseId,conditionId,new Approval(CurrentActor.username())); }
     @PostMapping("/{caseId}/assessments") @ResponseStatus(HttpStatus.CREATED)
     public Assessment assess(@PathVariable UUID caseId,@Valid @RequestBody NewAssessment body) { return service.assess(caseId,body.conditionId()); }
     @GetMapping("/{caseId}/assessments/{runId}")

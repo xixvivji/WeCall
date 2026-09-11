@@ -13,7 +13,7 @@ Spring 설정은 DB_URL, DB_USERNAME, DB_PASSWORD로 변경한다. Compose는 DB
 
 ## 요청
 
-`POST /api/v1/datasets` — multipart/form-data. 아래 명령은 저장소 루트에서 실행한다.
+`POST /api/v1/datasets` — multipart/form-data. 아래는 본문 형식 예시다. 실제 호출에는 로그인 세션 쿠키와 CSRF 헤더를 추가한다. 인증을 포함한 시연 스크립트 사용은 [로그인 가이드](auth-api.md)를 따른다.
 
 ```sh
 curl --fail-with-body http://127.0.0.1:8080/api/v1/datasets \
@@ -53,7 +53,7 @@ curl --fail-with-body http://127.0.0.1:8080/api/v1/datasets \
 ## 현재 범위
 
 JDBC + Flyway로 일괄 등록을 구현했다. JPA 엔터티는 아직 도입하지 않았다.
-인증 전 로컬 개발 API이므로 기본 바인딩은 127.0.0.1이다. 원본 파일 저장·해시·행별 조회 API·회수 판정·증거 보완은 후속 구현이다.
+[로그인한 검토자와 CSRF 헤더](auth-api.md)가 필요하다. 기본 바인딩은 127.0.0.1이다. 원본 파일 저장·해시·행별 조회 API는 후속 범위다.
 현재 dataset은 불변 입력 스냅샷이며 논리 ERD의 전체 사건·승인 모델은 아직 테이블화하지 않았다.
 
 ## 검증

@@ -1,4 +1,6 @@
 package com.wecall;
+import org.springframework.security.test.context.support.WithMockUser;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.fasterxml.jackson.databind.*;
 import com.wecall.dataset.DatasetService;
@@ -18,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@WithMockUser(username="test-reviewer",roles="REVIEWER")
 @SpringBootTest @AutoConfigureMockMvc @Import(PostgresTestConfiguration.class)
 class RecallWorkflowTests {
     @Autowired MockMvc mvc;
@@ -37,7 +40,7 @@ class RecallWorkflowTests {
         caseId=postJson("/api/v1/recalls",Map.of("title","샘플 회수","sourceType","SUPPLIER","sourceText",Files.readString(SAMPLE.resolve("notice.md"))),201).get("id").asText();
     }
     JsonNode postJson(String path,Object value,int status) throws Exception {
-        var response=mvc.perform(post(path).contentType("application/json").content(json.writeValueAsBytes(value)))
+        var response=mvc.perform(post(path).with(csrf()).contentType("application/json").content(json.writeValueAsBytes(value)))
             .andExpect(status().is(status)).andReturn().getResponse();
         return json.readTree(response.getContentAsByteArray());
     }
