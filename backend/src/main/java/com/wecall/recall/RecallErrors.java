@@ -6,8 +6,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
-@RestControllerAdvice(assignableTypes = {RecallController.class, EvidenceController.class, TaskController.class})
+@RestControllerAdvice(assignableTypes = {RecallController.class, EvidenceController.class, TaskController.class, ClosureController.class})
 class RecallErrors {
+    @ExceptionHandler(ClosureService.Blocked.class)
+    ResponseEntity<?> closureBlocked(ClosureService.Blocked e) {
+        return ResponseEntity.status(409).body(Map.of("code","CLOSURE_BLOCKED","message",e.getMessage(),"check",e.check));
+    }
     @ExceptionHandler(EvidenceService.Blocked.class)
     ResponseEntity<?> evidenceBlocked(EvidenceService.Blocked e) {
         return ResponseEntity.status(409).body(Map.of("code","EVIDENCE_BLOCKED","message",e.getMessage(),"issues",e.issues));
