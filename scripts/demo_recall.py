@@ -16,6 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:8080")
     parser.add_argument("--with-evidence", action="store_true", help="Approve synthetic receipt evidence and verify after results")
+    parser.add_argument("--with-tasks", action="store_true", help="Assign a response task, review proof and complete it")
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
 
@@ -81,6 +82,24 @@ def main():
                               "resultDatasetId": approved["resultDatasetId"], "resultAssessmentId": after["id"],
                               "inventoryTotals": after["inventoryTotals"], "shipmentTotals": after["shipmentTotals"],
                               "unlinkedS2": s2["unlinked"]}
+    if args.with_tasks:
+        task_assessment = after if args.with_evidence else result
+        task = request(prefix + "/tasks", {
+            "taskType": "QUARANTINE", "targetType": "INVENTORY", "assessmentId": task_assessment["id"],
+            "targetId": "I4", "title": "가상 I4 재고 격리 확인", "instructions": "가상 재고 30 EA의 격리 결과를 기록",
+            "actor": "demo-reviewer"})
+        task_url = prefix + f'/tasks/{task["id"]}'
+        task = request(task_url + "/assignment", {"expectedVersion": task["version"], "assignee": "demo-operator", "actor": "demo-reviewer", "note": "가상 작업 배정"})
+        task = request(task_url + "/transitions", {"expectedVersion": task["version"], "action": "START", "actor": "demo-operator", "note": "가상 작업 시작"})
+        task = request(task_url + "/proofs", {"expectedVersion": task["version"], "evidenceText": "시연용 가상 증빙: I4 30 EA 격리 확인. 실제 격리 실적 아님.", "actor": "demo-operator"})
+        proof_id = task["proofs"][0]["id"]
+        task = request(task_url + f'/proofs/{proof_id}/review', {"expectedVersion": task["version"], "decision": "ACCEPTED", "actor": "demo-reviewer", "note": "가상 증빙의 대상·수량 검토"})
+        task = request(task_url + "/transitions", {"expectedVersion": task["version"], "action": "COMPLETE", "actor": "demo-reviewer", "note": "가상 작업 완료 기록"})
+        if request(task_url) != task or task["status"] != "COMPLETED":
+            raise SystemExit("Task completion was not persisted")
+        if request(prefix + f'/assessments/{task_assessment["id"]}') != task_assessment:
+            raise SystemExit("Completing a task changed the assessment")
+        output["task"] = {"id": task["id"], "status": task["status"], "assignee": task["assignee"], "version": task["version"], "eventCount": len(task["events"])}
     print(json.dumps(output, ensure_ascii=False, indent=2))
 
 

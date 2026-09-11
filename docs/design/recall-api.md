@@ -6,7 +6,7 @@
 기존 Java 21 / Spring Boot 3.5.16 / Gradle 8.7 / PostgreSQL 구성을 사용한다.
 V2 Flyway 마이그레이션으로 recall_case, recall_condition, assessment_run을 추가한다.
 
-AI 추출, 자동 상품 매칭, 작업·종료 승인은 아직 구현하지 않았다. 추가 증거 승인은 [입고 증거 API](evidence-api.md)로 구현했다.
+AI 추출, 자동 상품 매칭, 사건 종료 승인은 아직 구현하지 않았다. 대응 작업은 [작업 API](task-api.md)로 구현했다. 추가 증거 승인은 [입고 증거 API](evidence-api.md)로 구현했다.
 인증·권한은 미구현이므로 승인자 reviewer는 **검증된 신원이 아닌 입력 라벨**이다. 로컬 개발용 API이며 기본 127.0.0.1 바인딩을 유지한다.
 
 ## 샘플 전체 실행
