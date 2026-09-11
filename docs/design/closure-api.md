@@ -3,7 +3,7 @@
 ## 의미와 범위
 
 종료는 제품 안의 **내부 업무 종료**다. 실제 물리적 회수 완료나 법적 의무 충족을 자동 판단하지 않는다.
-현재 검토자 이름은 입력 라벨이며 인증·권한 연결은 미구현이다. 대상 범위와 조치·증빙의 충분성은 사람이 최종 검토한다.
+검토자는 [로그인한 REVIEWER 계정](auth-api.md)을 사용한다. 대상 범위와 조치·증빙의 충분성은 사람이 최종 검토한다.
 확인 필요 판정을 강제로 비대상이나 완료로 바꾸는 예외 종료는 제공하지 않는다.
 
 ## API
@@ -34,7 +34,7 @@
 
 판정 UUID는 실제 값으로 대체한다. expectedVersion은 점검 응답의 version 또는 사건 응답의 lifecycleVersion이다.
 이는 **종료·재개 횟수 버전**이며 작업 version과 다르다. 종료 승인 시 작업 등 최신 상태를 잠금 아래 다시 점검하므로 이전 점검의 ready만 믿고 처리하지 않는다.
-reviewer 200자, note 2000자 이하의 공백 아닌 문자열이 필요하다. responseCoverageConfirmed가 false/누락이면 400이다.
+reviewer는 로그인 계정을 사용하므로 생략 가능하고 note는 2000자 이하의 공백 아닌 문자열이 필요하다. responseCoverageConfirmed가 false/누락이면 400이다.
 
 재개 요청: `{"expectedVersion":1,"reviewer":"local-reviewer","note":"정정 통보 도착으로 재검토"}`.
 종료 상태에서만 재개 가능하며 새 종료·재개마다 lifecycleVersion이 1 증가한다.

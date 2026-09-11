@@ -4,7 +4,7 @@
 
 격리·출고보류·판매보류·공급사 확인·반품 확인·안내 준비 작업을 수동 등록하고 담당자, 진행 상태, 텍스트 증빙, 검토 결과, 이력을 기록한다.
 이 API는 **조치의 기록**이다. 창고·판매 채널에 실행 명령을 보내거나 고객에게 발송하지 않는다. 원본 재고·판정 결과를 변경하지 않는다.
-담당자와 actor는 현재 입력 라벨이며 인증된 사용자 ID가 아니다. 역할별 접근 제어, 파일 첨부, 자동 작업 생성은 후속 범위다. 사건 종료는 [종료 API](closure-api.md)로 구현했다.
+담당자는 활성 계정 username, actor는 로그인 계정에서 결정한다. [역할별 접근 제어](auth-api.md)가 적용되며 파일 첨부·자동 작업 생성은 후속 범위다. 사건 종료는 [종료 API](closure-api.md)로 구현했다.
 
 ## 대상과 상태
 
@@ -60,7 +60,7 @@ taskType: QUARANTINE / SHIPMENT_HOLD / SALES_HOLD / SUPPLIER_CHECK / RETURN_CONF
 assignee는 생성 시 생략하거나 지정한다. title 200자, instructions 10000자, targetId 500자 이하.
 현재 작업 종류와 대상 종류의 업무 적합성은 담당자가 판단한다. 수량은 지시문과 증빙에서 관리하며 별도 완료 수량 원장은 아직 없다.
 
-배정: `{"expectedVersion":0,"assignee":"물류 담당","actor":"품질 담당","note":"창고 업무 배정"}`.
+배정: `{"expectedVersion":0,"assignee":"demo-operator","actor":"품질 담당","note":"창고 업무 배정"}`.
 
 상태 전이: `{"expectedVersion":1,"action":"START","actor":"물류 담당","note":"처리 시작"}`.
 
@@ -69,7 +69,7 @@ assignee는 생성 시 생략하거나 지정한다. title 200자, instructions 
 증빙 검토: `{"expectedVersion":3,"decision":"ACCEPTED","actor":"품질 담당","note":"대상·수량·처리 내용 확인"}`.
 REJECTED와 사유를 입력해 거절할 수 있다. 검토 완료 증빙은 덮어쓰거나 재검토하지 않으며 수정 자료를 새로 등록한다.
 
-evidenceText는 100000자, actor/assignee는 200자, note는 2000자 이하의 공백 아닌 문자열이다.
+evidenceText는 100000자, note는 2000자 이하의 공백 아닌 문자열이다. assignee는 활성 계정 username이다. actor는 생략 가능하며 로그인 계정으로 대체한다.
 검토는 사람이 증빙의 적합성과 충분성을 확인한 결과다. 코드가 증빙 내용의 진위를 자동 검증하는 것은 아니다. SHA-256은 저장 텍스트 식별에 사용한다.
 
 ## 동시 수정과 이력

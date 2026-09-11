@@ -1,8 +1,9 @@
 """Create a fresh synthetic dataset/case and run the approved demo workflow.
 
-Requires an already-running local backend. No real reviewer authentication is implied.
+Requires an already-running local backend. Requires WECALL_USERNAME and WECALL_PASSWORD for an actual local account.
 """
 import argparse
+from api_client import ApiClient
 import json
 from pathlib import Path
 import urllib.error
@@ -20,15 +21,8 @@ def main():
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
 
-    def request(path, body=None, content_type="application/json"):
-        if isinstance(body, dict):
-            body = json.dumps(body, ensure_ascii=False).encode()
-        req = urllib.request.Request(base + path, data=body, headers={"Content-Type": content_type})
-        try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                return json.load(response)
-        except urllib.error.HTTPError as exc:
-            raise SystemExit(f"HTTP {exc.code}: {exc.read().decode()}") from exc
+    client = ApiClient(base)
+    request = client.request
 
     boundary = "wecall-" + uuid.uuid4().hex
     parts = []
@@ -100,6 +94,7 @@ def main():
         if request(prefix + f'/assessments/{task_assessment["id"]}') != task_assessment:
             raise SystemExit("Completing a task changed the assessment")
         output["task"] = {"id": task["id"], "status": task["status"], "assignee": task["assignee"], "version": task["version"], "eventCount": len(task["events"])}
+    client.logout()
     print(json.dumps(output, ensure_ascii=False, indent=2))
 
 

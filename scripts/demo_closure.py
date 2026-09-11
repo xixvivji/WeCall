@@ -1,5 +1,6 @@
 """Demonstrate blocked closure and successful closure using separate synthetic cases."""
 import argparse
+from api_client import ApiClient
 import json
 from pathlib import Path
 import subprocess
@@ -14,19 +15,8 @@ def main():
     parser.add_argument("--base-url", default="http://127.0.0.1:8080")
     base = parser.parse_args().base_url.rstrip("/")
 
-    def request(path, body=None, expected=200, content_type="application/json"):
-        if isinstance(body, dict):
-            body = json.dumps(body, ensure_ascii=False).encode()
-        req = urllib.request.Request(base + path, data=body, headers={"Content-Type": content_type})
-        try:
-            response = urllib.request.urlopen(req, timeout=30)
-        except urllib.error.HTTPError as error:
-            response = error
-        with response:
-            result = json.load(response)
-            if response.code != expected:
-                raise SystemExit(f"Expected {expected}, got {response.code}: {result}")
-            return result
+    client = ApiClient(base)
+    request = client.request
 
     demo = Path(__file__).with_name("demo_recall.py")
     unresolved = json.loads(subprocess.check_output([sys.executable, str(demo), "--base-url", base, "--with-evidence", "--with-tasks"], text=True))
@@ -77,6 +67,7 @@ def main():
     final = request(prefix + "/closure", close_body)
     if final["status"] != "CLOSED" or len(final["history"]) != 3:
         raise SystemExit("Unexpected final lifecycle")
+    client.logout()
     print(json.dumps({"blockedCaseId": unresolved["caseId"], "blockedReason": "UNRESOLVED_SHIPMENTS", "closedCaseId": case["id"], "finalStatus": final["status"], "history": [event["type"] for event in final["history"]]}, ensure_ascii=False, indent=2))
 
 
