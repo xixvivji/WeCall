@@ -58,8 +58,12 @@ erDiagram
 - 조건은 제한된 AND/OR 트리로 저장한다. 누락은 UNKNOWN으로 평가하고 FALSE AND UNKNOWN은 FALSE, TRUE OR UNKNOWN은 TRUE다. 남은 UNKNOWN만 확인 필요다.
 - 재판정은 새 실행을 생성한다. 이전 결과를 갱신하지 않으며 조건·데이터·상품 연결·승인된 보완의 정확한 버전을 기록한다.
 - 추가 증거 승인은 특정 입고 사실만 보완한다. 없는 출고 연결을 생성하지 않는다.
-- AI 분석 실행에는 요청 ID, 입력 해시, 모델·프롬프트 버전, 응답, 오류, 처리 시간을 기록한다. 상세 분석 테이블은 AI API 계약과 함께 설계한다.
+- AI 분석 실행에는 요청 ID, 입력 해시, 모델·프롬프트 버전, 응답, 오류, 처리 시간을 기록한다. V7 extraction_job에 저장하며 상세 계약은 조건 추출 API 문서를 따른다.
 
 ## 다음 구현 범위
 
 CSV 검증·등록과 입력 스키마에 이어 사건·조건 버전·승인·판정 실행·영향 조회를 구현했다. V2는 recall_case, recall_condition, assessment_run을 추가하며 개별 판정은 assessment_run.result JSONB에 보존한다. 논리 모델의 상품 검토는 조건 정의에 포함한다. V3의 receipt_evidence는 입고 텍스트·제안값·검토 이력·기준/결과 판정을 보존한다. 보완 승인은 전체 데이터 스냅샷 복제와 재판정으로 구현했으며 별도 RECEIPT_CORRECTION 테이블은 아직 없다. V4의 response_task, response_task_proof, response_task_event로 수동 대응 작업·배정·증빙·검토·완료/재개 이력을 구현했다. V5에서 사건 OPEN/CLOSED 상태와 case_lifecycle_event로 종료 점검·승인·재개 이력을 구현했다. V6의 app_user로 로그인 계정과 REVIEWER/OPERATOR 역할을 구현했다. 신규 승인·작업 이력은 로그인 username을 사용하며 과거 라벨은 보존한다.
+
+## V7 조건 추출 작업
+
+`recall_case` 1:N `extraction_job`. 원문·SHA-256, 처리 상태, 원본 응답·검증 결과, 오류, 시간, 요청자·검토자를 보존한다. 성공 결과를 검토하면 `condition_id`로 별도 `recall_condition` 초안을 연결한다. 진행 중인 작업은 사건별 하나로 제한한다.

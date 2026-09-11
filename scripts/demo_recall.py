@@ -9,6 +9,7 @@ from pathlib import Path
 import urllib.error
 import urllib.request
 import uuid
+import time
 
 SAMPLE = Path(__file__).resolve().parents[1] / "samples" / "recall-001"
 
@@ -18,6 +19,7 @@ def main():
     parser.add_argument("--base-url", default="http://127.0.0.1:8080")
     parser.add_argument("--with-evidence", action="store_true", help="Approve synthetic receipt evidence and verify after results")
     parser.add_argument("--with-tasks", action="store_true", help="Assign a response task, review proof and complete it")
+    parser.add_argument("--with-extraction", action="store_true", help="Use explicitly enabled FastAPI fixture extraction")
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
 
@@ -37,7 +39,24 @@ def main():
     prefix = f'/api/v1/recalls/{case["id"]}'
     definition = json.loads((SAMPLE / "condition-request.json").read_text())
     definition["datasetId"] = dataset["datasetId"]
-    condition = request(prefix + "/conditions", definition)
+    extraction = None
+    if args.with_extraction:
+        extraction = request(prefix + "/extractions", {}, expected=202)
+        deadline = time.monotonic() + 30
+        while extraction["status"] in ("QUEUED", "RUNNING") and time.monotonic() < deadline:
+            time.sleep(0.25)
+            extraction = request(prefix + f'/extractions/{extraction["id"]}')
+        if extraction["status"] != "SUCCEEDED":
+            raise SystemExit(f"Extraction failed: {extraction['status']} / {extraction['errorCode']}")
+        if extraction["output"]["mode"] != "MOCK":
+            raise SystemExit("This synthetic demo expects explicit MOCK mode")
+        definition["rule"] = extraction["output"]["rule"]
+        definition["sourceQuote"] = extraction["output"]["sourceQuote"]
+        extraction = request(prefix + f'/extractions/{extraction["id"]}/condition',
+                             {"definition": definition, "note": "합성 샘플 조건·상품 연결 검토 시연"}, expected=201)
+        condition = {"id": extraction["conditionId"]}
+    else:
+        condition = request(prefix + "/conditions", definition)
     request(prefix + f'/conditions/{condition["id"]}/approval', {"reviewer": "demo-reviewer"})
     result = request(prefix + "/assessments", {"conditionId": condition["id"]})
     stored = request(prefix + f'/assessments/{result["id"]}')
@@ -51,6 +70,9 @@ def main():
     output = {"datasetId": dataset["datasetId"], "caseId": case["id"], "conditionId": condition["id"], "assessmentId": result["id"],
               "inventoryTotals": result["inventoryTotals"], "shipmentTotals": result["shipmentTotals"],
               "resultUrl": base + prefix + f'/assessments/{result["id"]}'}
+    if extraction:
+        output["extraction"] = {key: extraction[key] for key in ("id", "status", "reviewStatus")}
+        output["extraction"]["mode"] = extraction["output"]["mode"]
     if args.with_evidence:
         proposal = json.loads((SAMPLE / "evidence-request.json").read_text())
         proposal["baseAssessmentId"] = result["id"]
