@@ -1,4 +1,6 @@
 package com.wecall;
+import org.springframework.security.test.context.support.WithMockUser;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -23,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static com.wecall.recall.RecallModels.*;
 
+@WithMockUser(username="test-reviewer",roles="REVIEWER")
 @SpringBootTest @AutoConfigureMockMvc @Import(PostgresTestConfiguration.class)
 class ReceiptEvidenceTests {
     @Autowired MockMvc mvc;
@@ -50,7 +53,7 @@ class ReceiptEvidenceTests {
     }
     String prefix() { return "/api/v1/recalls/"+caseId+"/evidence"; }
     JsonNode postJson(String path,Object body,int expected) throws Exception {
-        var response=mvc.perform(post(path).contentType("application/json").content(json.writeValueAsBytes(body)))
+        var response=mvc.perform(post(path).with(csrf()).contentType("application/json").content(json.writeValueAsBytes(body)))
             .andExpect(status().is(expected)).andReturn().getResponse();
         return json.readTree(response.getContentAsByteArray());
     }

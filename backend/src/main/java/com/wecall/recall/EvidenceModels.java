@@ -18,12 +18,12 @@ public final class EvidenceModels {
         LocalDate expiryDate
     ) {}
     public record ApproveEvidence(
-        @NotBlank @Size(max=200) String reviewer,
+        @Pattern(regexp="(?s).*\\S.*") @Size(max=200) String reviewer,
         @NotBlank @Size(max=2000) String note,
         @AssertTrue(message="입고 건·상품·수량·날짜와 단일 제조분 증거를 직접 확인해야 합니다")
         boolean receiptAndSingleLotConfirmed
     ) {}
-    public record RejectEvidence(@NotBlank @Size(max=200) String reviewer,
+    public record RejectEvidence(@Pattern(regexp="(?s).*\\S.*") @Size(max=200) String reviewer,
                                  @NotBlank @Size(max=2000) String note) {}
     public record Issue(String field, String code, String message) {}
     public record ReceiptFacts(String productId, long receivedQuantity, LocalDate receivedAt,

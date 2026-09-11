@@ -1,6 +1,7 @@
 package com.wecall.recall;
 
 import jakarta.validation.Valid;
+import com.wecall.auth.CurrentActor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
@@ -16,7 +17,7 @@ public class EvidenceController {
     @GetMapping("/{evidenceId}")
     public Map<String,Object> get(@PathVariable UUID caseId,@PathVariable UUID evidenceId) { return service.get(caseId,evidenceId); }
     @PostMapping("/{evidenceId}/approval")
-    public Map<String,Object> approve(@PathVariable UUID caseId,@PathVariable UUID evidenceId,@Valid @RequestBody ApproveEvidence body) { return service.approve(caseId,evidenceId,body); }
+    public Map<String,Object> approve(@PathVariable UUID caseId,@PathVariable UUID evidenceId,@Valid @RequestBody ApproveEvidence body) { return service.approve(caseId,evidenceId,new ApproveEvidence(CurrentActor.username(),body.note(),body.receiptAndSingleLotConfirmed())); }
     @PostMapping("/{evidenceId}/rejection")
-    public Map<String,Object> reject(@PathVariable UUID caseId,@PathVariable UUID evidenceId,@Valid @RequestBody RejectEvidence body) { return service.reject(caseId,evidenceId,body); }
+    public Map<String,Object> reject(@PathVariable UUID caseId,@PathVariable UUID evidenceId,@Valid @RequestBody RejectEvidence body) { return service.reject(caseId,evidenceId,new RejectEvidence(CurrentActor.username(),body.note())); }
 }

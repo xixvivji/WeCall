@@ -1,4 +1,6 @@
 package com.wecall;
+import org.springframework.security.test.context.support.WithMockUser;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -24,6 +26,7 @@ import static com.wecall.recall.RecallModels.*;
 import static com.wecall.recall.TaskModels.*;
 import static com.wecall.recall.ClosureModels.*;
 
+@WithMockUser(username="test-reviewer",roles="REVIEWER")
 @SpringBootTest @AutoConfigureMockMvc @Import(PostgresTestConfiguration.class)
 class CaseClosureTests {
     @Autowired MockMvc mvc;
@@ -70,7 +73,7 @@ class CaseClosureTests {
     CloseRequest closeBody(long version) { return new CloseRequest(run.id(),version,"검토자","대상 범위·조치·취소 사항 검토 완료",true); }
     String prefix() { return "/api/v1/recalls/"+caseId; }
     JsonNode postJson(String url,Object body,int expected) throws Exception {
-        return json.readTree(mvc.perform(post(url).contentType("application/json").content(json.writeValueAsBytes(body))).andExpect(status().is(expected)).andReturn().getResponse().getContentAsByteArray());
+        return json.readTree(mvc.perform(post(url).with(csrf()).contentType("application/json").content(json.writeValueAsBytes(body))).andExpect(status().is(expected)).andReturn().getResponse().getContentAsByteArray());
     }
     Set<String> blockers(Map<String,Object> check) {
         Set<String> codes=new HashSet<>(); for (var issue:(List<?>)check.get("blockers")) codes.add(((ClosureModels.Issue)issue).code()); return codes;

@@ -1,4 +1,6 @@
 package com.wecall;
+import org.springframework.security.test.context.support.WithMockUser;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@WithMockUser(username="test-reviewer",roles="REVIEWER")
 @SpringBootTest @AutoConfigureMockMvc @Import(PostgresTestConfiguration.class)
 class DatasetImportTests {
     @Autowired MockMvc mvc;
@@ -22,6 +25,7 @@ class DatasetImportTests {
     @BeforeEach void clean() { jdbc.execute("TRUNCATE dataset CASCADE"); }
     MockMultipartHttpServletRequestBuilder request(String file, String oldText, String newText) throws Exception {
         var req = multipart("/api/v1/datasets");
+        req.with(csrf());
         req.param("asOf","2026-09-09T18:00:00+09:00");
         for (var entry : FILES.entrySet()) {
             String text = Files.readString(Path.of("../samples/recall-001/"+entry.getValue()+".csv"));

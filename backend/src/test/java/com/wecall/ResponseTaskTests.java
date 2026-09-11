@@ -1,4 +1,6 @@
 package com.wecall;
+import org.springframework.security.test.context.support.WithMockUser;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -23,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static com.wecall.recall.RecallModels.*;
 import static com.wecall.recall.TaskModels.*;
 
+@WithMockUser(username="test-reviewer",roles="REVIEWER")
 @SpringBootTest @AutoConfigureMockMvc @Import(PostgresTestConfiguration.class)
 class ResponseTaskTests {
     @Autowired MockMvc mvc;
@@ -48,17 +51,17 @@ class ResponseTaskTests {
     }
     String prefix() { return "/api/v1/recalls/"+caseId+"/tasks"; }
     JsonNode postJson(String url,Object body,int status) throws Exception {
-        return json.readTree(mvc.perform(post(url).contentType("application/json").content(json.writeValueAsBytes(body)))
+        return json.readTree(mvc.perform(post(url).with(csrf()).contentType("application/json").content(json.writeValueAsBytes(body)))
             .andExpect(status().is(status)).andReturn().getResponse().getContentAsByteArray());
     }
     JsonNode create() throws Exception {
-        return postJson(prefix(),new NewTask(TaskType.QUARANTINE,TargetType.INVENTORY,assessment.id(),"I4","R4 재고 임시 격리","정보 확인 전 30개 임시 격리","물류 담당","품질 담당"),201);
+        return postJson(prefix(),new NewTask(TaskType.QUARANTINE,TargetType.INVENTORY,assessment.id(),"I4","R4 재고 임시 격리","정보 확인 전 30개 임시 격리","test-operator","품질 담당"),201);
     }
     JsonNode transition(JsonNode t,String action,int status) throws Exception {
         return postJson(prefix()+"/"+t.get("id").asText()+"/transitions",Map.of("expectedVersion",t.get("version").asLong(),"action",action,"actor","품질 담당","note","처리 사유 기록"),status);
     }
     JsonNode proof(JsonNode t) throws Exception {
-        return postJson(prefix()+"/"+t.get("id").asText()+"/proofs",Map.of("expectedVersion",t.get("version").asLong(),"evidenceText","합성 증빙: I4 30개 격리 구역 확인","actor","물류 담당"),201);
+        return postJson(prefix()+"/"+t.get("id").asText()+"/proofs",Map.of("expectedVersion",t.get("version").asLong(),"evidenceText","합성 증빙: I4 30개 격리 구역 확인","actor","test-operator"),201);
     }
     JsonNode review(JsonNode t,int proofIndex,String decision) throws Exception {
         return postJson(prefix()+"/"+t.get("id").asText()+"/proofs/"+t.get("proofs").get(proofIndex).get("id").asText()+"/review",
@@ -81,7 +84,7 @@ class ResponseTaskTests {
         JsonNode t=postJson(url,new NewTask(TaskType.SALES_HOLD,TargetType.CASE,null,null,"판매보류 확인","긴급 통보 범위 확인",null,"품질"),201);
         String action=url+"/"+t.get("id").asText();
         postJson(action+"/transitions",Map.of("expectedVersion",0,"action","START","actor","품질","note","시작"),409);
-        t=postJson(action+"/assignment",Map.of("expectedVersion",0,"assignee","채널 담당","actor","품질","note","배정"),200);
+        t=postJson(action+"/assignment",Map.of("expectedVersion",0,"assignee","test-operator","actor","품질","note","배정"),200);
         postJson(action+"/transitions",Map.of("expectedVersion",1,"action","START","actor","품질","note","시작"),200);
         assertThat(t.get("events").get(1).get("type").asText()).isEqualTo("ASSIGNED");
     }
@@ -104,7 +107,7 @@ class ResponseTaskTests {
         var t=transition(create(),"CANCEL",200);
         assertThat(t.get("status").asText()).isEqualTo("CANCELLED"); assertThat(t.get("completedAt").isNull()).isTrue();
         transition(t,"START",409); transition(t,"REOPEN",409);
-        postJson(prefix()+"/"+t.get("id").asText()+"/assignment",new Assignment(t.get("version").asLong(),"다른 담당","품질","변경"),409);
+        postJson(prefix()+"/"+t.get("id").asText()+"/assignment",new Assignment(t.get("version").asLong(),"test-operator","품질","변경"),409);
     }
     @Test void validatesTargetAndCaseOwnership() throws Exception {
         postJson(prefix(),new NewTask(TaskType.QUARANTINE,TargetType.INVENTORY,assessment.id(),"MISSING","격리","확인",null,"품질"),400);
