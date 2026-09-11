@@ -53,6 +53,7 @@ public class ClosureService {
             totals=Map.of("inventory",run.inventoryTotals(),"shipments",run.shipmentTotals());
             targetQuantity=run.inventoryTotals().target()+run.shipmentTotals().target();
         }
+        issue(blockers,"UNREVIEWED_EXTRACTIONS","진행 중이거나 검토하지 않은 조건 분석이 남아 있습니다",count("SELECT count(*) FROM extraction_job WHERE case_id=? AND review_status='PENDING'",caseId));
         var tasks=jdbc.queryForList("SELECT id,status,version,review_round,assessment_id FROM response_task WHERE case_id=? ORDER BY id",caseId);
         long incomplete=tasks.stream().filter(t->Set.of("OPEN","IN_PROGRESS").contains(t.get("status"))).count();
         long completed=tasks.stream().filter(t->t.get("status").equals("COMPLETED")).count();
@@ -71,6 +72,7 @@ public class ClosureService {
         result.put("assessmentId",assessmentId);result.put("latestCondition",latest.isEmpty()?null:latest.getFirst());result.put("totals",totals);
         result.put("ready",blockers.isEmpty());result.put("blockers",blockers);result.put("warnings",warnings);
         result.put("tasks",tasks);result.put("receiptEvidence",receiptEvidence);result.put("taskProofs",proofs);
+        result.put("extractions",jdbc.queryForList("SELECT id,status,review_status,condition_id,reviewed_by,review_note FROM extraction_job WHERE case_id=? ORDER BY id",caseId));
         result.put("coverageConfirmationRequired",true);
         return result;
     }

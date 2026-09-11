@@ -27,3 +27,8 @@ management:
   endpoint:
     health:
       show-details: never
+wecall:
+  ai:
+    base-url: ${WECALL_AI_BASE_URL:http://127.0.0.1:8000}
+    service-token: ${WECALL_AI_SERVICE_TOKEN:}
+    allow-mock: ${WECALL_AI_ALLOW_MOCK:false}
