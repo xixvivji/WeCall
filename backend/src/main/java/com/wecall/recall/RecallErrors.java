@@ -26,7 +26,8 @@ class RecallErrors {
             .map(f->Map.of("field",f.getField(),"message",String.valueOf(f.getDefaultMessage()))).toList()));
     }
     @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
-    ResponseEntity<?> invalidId(Exception e) {
+    ResponseEntity<?> invalidId(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException e) {
+        if(!java.util.UUID.class.equals(e.getRequiredType())) return ResponseEntity.badRequest().body(Map.of("code","INVALID_REQUEST","message","조회 매개변수의 타입과 형식을 확인하세요"));
         return ResponseEntity.badRequest().body(Map.of("code","INVALID_ID","message","경로 ID는 UUID 형식이어야 합니다"));
     }
     @ExceptionHandler(HttpMessageNotReadableException.class)

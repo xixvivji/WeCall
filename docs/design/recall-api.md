@@ -107,3 +107,7 @@ sourceType: SUPPLIER / OFFICIAL / INTERNAL. 제목은 200자, 원문은 100000�
 `cd backend && ./gradlew test bootJar`로 PostgreSQL 통합 테스트와 조건 엔진 테스트를 실행한다.
 샘플의 수작업 정답 CSV/JSON과 결과를 비교하며, 이전 판정 보존·미승인 차단·날짜 경계·누락값 논리·행 관계를 검사한다.
 추가 증거 승인 후(after) 정답 검증도 입고 증거 통합 테스트와 `demo_recall.py --with-evidence`에 포함한다.
+
+## 사건 목록과 판정 이력 조회
+
+GET `/api/v1/recalls`와 GET `/api/v1/recalls/{caseId}/assessments`를 지원한다. 검색·페이지 처리 및 데이터 조회 계약은 [Vue 업무 화면·조회 API](frontend-workspace.md)를 참고한다.

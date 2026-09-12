@@ -17,6 +17,12 @@ public class DatasetController {
     private final DatasetService service;
     public DatasetController(DatasetService service) { this.service = service; }
 
+    @GetMapping
+    public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {return service.list(page,size);}
+    @GetMapping("/{id}/products")
+    public Map<String,Object> products(@PathVariable java.util.UUID id,@RequestParam(defaultValue="") String q,
+        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {return service.products(id,q,page,size);}
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String,Object> upload(
@@ -31,6 +37,10 @@ public class DatasetController {
 
 @RestControllerAdvice(assignableTypes = DatasetController.class)
 class DatasetErrors {
+    @ExceptionHandler(com.wecall.recall.RecallService.Failure.class)
+    ResponseEntity<?> failure(com.wecall.recall.RecallService.Failure e) {
+        return ResponseEntity.status(e.status).body(Map.of("code",e.status.name(),"message",e.getMessage()));
+    }
     @ExceptionHandler(DatasetService.InvalidDataset.class)
     ResponseEntity<?> invalid(DatasetService.InvalidDataset e) {
         return ResponseEntity.badRequest().body(Map.of("code","INVALID_DATASET","errors",e.errors));
