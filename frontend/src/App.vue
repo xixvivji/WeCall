@@ -6,8 +6,16 @@ import {
   LogOut,
   ShieldCheck,
   Users,
+  KeyRound,
 } from "@lucide/vue";
-import { user, restoreSession, login, logout, errorText } from "./api";
+import {
+  user,
+  restoreSession,
+  login,
+  logout,
+  errorText,
+  sessionNotice,
+} from "./api";
 const ready = ref(false),
   busy = ref(false),
   error = ref(""),
@@ -65,6 +73,7 @@ async function signOut() {
       <div class="eyebrow">WORKSPACE LOGIN</div>
       <h2>WeCall에 로그인</h2>
       <p class="muted">발급받은 계정으로 업무 공간에 접속하세요.</p>
+      <p v-if="sessionNotice" class="note" role="status">{{ sessionNotice }}</p>
       <form @submit.prevent="signIn">
         <label
           >계정명<input
@@ -105,6 +114,7 @@ async function signOut() {
         <RouterLink v-if="user.roles.includes('REVIEWER')" to="/users"
           ><Users :size="20" />계정 관리</RouterLink
         >
+        <RouterLink to="/account"><KeyRound :size="20" />내 계정</RouterLink>
       </nav>
       <div class="sidebar-bottom">
         <div class="avatar">{{ user.username.slice(0, 1).toUpperCase() }}</div>
