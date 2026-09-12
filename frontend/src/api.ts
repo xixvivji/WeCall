@@ -4,6 +4,7 @@ export interface User {
   roles: string[];
 }
 export const user = ref<User | null>(null);
+export const sessionNotice = ref("");
 let csrf: { token: string; headerName: string } | null = null;
 export class ApiError extends Error {
   constructor(
@@ -46,6 +47,9 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
     if (response.status === 401) {
       user.value = null;
       csrf = null;
+      if (data?.code === "SESSION_REVOKED")
+        sessionNotice.value =
+          "계정 보안 설정이 변경되어 로그아웃됐습니다. 다시 로그인해 주세요.";
     }
     const messages: Record<string, string> = {
       INVALID_CREDENTIALS: "계정명 또는 비밀번호를 확인하세요.",
@@ -80,6 +84,7 @@ export async function login(username: string, password: string) {
   await api("/api/auth/login", new URLSearchParams({ username, password }));
   csrf = null;
   await restoreSession();
+  sessionNotice.value = "";
 }
 export async function logout() {
   await api("/api/auth/logout", {});
@@ -213,4 +218,14 @@ export interface Assessment {
     needsReview: number;
     unlinked: number;
   }[];
+}
+
+export async function changeOwnPassword(
+  currentPassword: string,
+  newPassword: string,
+) {
+  await api("/api/auth/password", { currentPassword, newPassword });
+  csrf = null;
+  sessionNotice.value = "비밀번호가 변경됐습니다. 새 비밀번호로 로그인하세요.";
+  user.value = null;
 }

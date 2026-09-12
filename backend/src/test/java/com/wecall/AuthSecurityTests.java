@@ -42,9 +42,10 @@ class AuthSecurityTests {
         var body=json.readTree(result.getResponse().getContentAsByteArray());
         return new Client((MockHttpSession)result.getRequest().getSession(false),body.get("headerName").asText(),body.get("token").asText());
     }
-    Client login(String user) throws Exception {
+    Client login(String user) throws Exception {return login(user,PASSWORD);}
+    Client login(String user,String password) throws Exception {
         var pre=csrf(null);String previousId=pre.session().getId();
-        var result=mvc.perform(post("/api/auth/login").session(pre.session()).header(pre.header(),pre.token()).param("username",user).param("password",PASSWORD))
+        var result=mvc.perform(post("/api/auth/login").session(pre.session()).header(pre.header(),pre.token()).param("username",user).param("password",password))
             .andExpect(status().isOk()).andReturn();
         var session=(MockHttpSession)result.getRequest().getSession(false);
         assertThat(session.getId()).isNotEqualTo(previousId);
@@ -57,6 +58,43 @@ class AuthSecurityTests {
     }
     UUID caseId() {return (UUID)recalls.createCase(new RecallModels.NewCase("인증 검증 사건",RecallModels.SourceType.INTERNAL,"긴급 보류")).get("id");}
     Map<String,Object> task(UUID caseId,String assignee) {return tasks.create(caseId,new NewTask(TaskType.SALES_HOLD,TargetType.CASE,null,null,"판매보류","지시 확인",assignee,"trusted-fixture"));}
+    @Test void passwordChangeRevokesEverySessionAndPreservesAuditWithoutSecrets() throws Exception {
+        var a=login("auth-operator");var b=login("auth-operator");
+        postJson(a,"/api/auth/password",Map.of("currentPassword","wrong","newPassword","replacement-password-123"),400);
+        assertThat(jdbc.queryForObject("SELECT security_version FROM app_user WHERE username='auth-operator'",Long.class)).isZero();
+        mvc.perform(post("/api/auth/password").session(a.session()).header(a.header(),a.token()).contentType("application/json")
+            .content(json.writeValueAsBytes(Map.of("currentPassword",PASSWORD,"newPassword","replacement-password-123"))))
+            .andExpect(status().isNoContent());
+        assertThat(a.session().isInvalid()).isTrue();
+        mvc.perform(get("/api/auth/me").session(b.session())).andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("SESSION_REVOKED"));
+        var anonymous=csrf(null);
+        mvc.perform(post("/api/auth/login").session(anonymous.session()).header(anonymous.header(),anonymous.token()).param("username","auth-operator").param("password",PASSWORD)).andExpect(status().isUnauthorized());
+        var fresh=login("auth-operator","replacement-password-123");
+        mvc.perform(get("/api/auth/me").session(fresh.session())).andExpect(status().isOk());
+        var reviewer=login("auth-reviewer");
+        String events=mvc.perform(get("/api/users/auth-operator/events").session(reviewer.session())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(events).contains("PASSWORD_CHANGED").doesNotContain(PASSWORD,"replacement-password-123","password_hash");
+    }
+    @Test void disablingBlocksOldSessionsAndReenableCannotResurrectThem() throws Exception {
+        var reviewer=login("auth-reviewer");var old=login("auth-operator");var dormant=login("auth-operator");
+        postJson(reviewer,"/api/users/auth-operator/status",Map.of("enabled",false,"expectedVersion",0,"note","퇴사 처리"),200);
+        mvc.perform(get("/api/auth/me").session(old.session())).andExpect(status().isUnauthorized());
+        var anonymous=csrf(null);
+        mvc.perform(post("/api/auth/login").session(anonymous.session()).header(anonymous.header(),anonymous.token()).param("username","auth-operator").param("password",PASSWORD)).andExpect(status().isUnauthorized());
+        postJson(reviewer,"/api/users/auth-operator/status",Map.of("enabled",true,"expectedVersion",0,"note","오래된 요청"),409);
+        postJson(reviewer,"/api/users/auth-operator/status",Map.of("enabled",true,"expectedVersion",1,"note","재입사 확인"),200);
+        mvc.perform(get("/api/auth/me").session(dormant.session())).andExpect(status().isUnauthorized());
+        login("auth-operator");
+    }
+    @Test void accountChangesEnforceRoleSelfProtectionAndCsrf() throws Exception {
+        var reviewer=login("auth-reviewer");var operator=login("auth-operator");
+        postJson(reviewer,"/api/users/auth-reviewer/status",Map.of("enabled",false,"expectedVersion",0,"note","본인 차단"),409);
+        postJson(operator,"/api/users/auth-other/status",Map.of("enabled",false,"expectedVersion",0,"note","권한 없음"),403);
+        mvc.perform(get("/api/users/auth-other/events").session(operator.session())).andExpect(status().isForbidden());
+        mvc.perform(post("/api/auth/password").session(operator.session()).contentType("application/json").content("{}")).andExpect(status().isForbidden());
+        postJson(operator,"/api/auth/password",Map.of("currentPassword",PASSWORD,"newPassword",PASSWORD),400);
+        postJson(operator,"/api/auth/password",Map.of("currentPassword",PASSWORD,"newPassword","가".repeat(25)),400);
+    }
     @Test void requiresLoginAndDoesNotOfferPublicSignup() throws Exception {
         mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/recalls/"+UUID.randomUUID())).andExpect(status().isUnauthorized());

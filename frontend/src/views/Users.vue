@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
-import { api, user, errorText } from "../api";
+import { api, user, errorText, dateText } from "../api";
 interface Account {
   username: string;
   displayName: string;
   role: string;
   enabled: boolean;
+  version: number;
 }
 const accounts = ref<Account[]>([]),
   error = ref(""),
@@ -16,6 +17,61 @@ const accounts = ref<Account[]>([]),
   displayName = ref(""),
   password = ref(""),
   role = ref("OPERATOR");
+const selected = ref<Account>(),
+  note = ref(""),
+  events = ref<
+    {
+      id: string;
+      actor: string;
+      type: string;
+      note: string;
+      createdAt: string;
+    }[]
+  >([]);
+let detailRequest = 0;
+async function select(account: Account) {
+  if (busy.value) return;
+  const ticket = ++detailRequest;
+  selected.value = { ...account };
+  note.value = "";
+  events.value = [];
+  error.value = "";
+  try {
+    const rows = await api<typeof events.value>(
+      `/api/users/${encodeURIComponent(account.username)}/events`,
+    );
+    if (ticket === detailRequest) events.value = rows;
+  } catch (e) {
+    if (ticket === detailRequest) error.value = errorText(e);
+  }
+}
+async function changeStatus() {
+  if (!selected.value) return;
+  ++detailRequest;
+  busy.value = true;
+  error.value = "";
+  try {
+    const target = selected.value;
+    await api(`/api/users/${encodeURIComponent(target.username)}/status`, {
+      enabled: !target.enabled,
+      expectedVersion: target.version,
+      note: note.value,
+    });
+    success.value = target.enabled
+      ? "계정을 비활성화했습니다. 기존 로그인은 더 이상 사용할 수 없습니다."
+      : "계정을 다시 활성화했습니다. 새로 로그인해야 합니다.";
+    await load();
+    selected.value = undefined;
+    events.value = [];
+    note.value = "";
+  } catch (e) {
+    error.value = errorText(e) + " 계정 목록을 다시 확인하세요.";
+    await load();
+    selected.value = undefined;
+  } finally {
+    busy.value = false;
+  }
+}
 const reviewer = computed(() => user.value?.roles.includes("REVIEWER"));
 async function load() {
   if (!reviewer.value) return;
@@ -134,6 +190,7 @@ onMounted(load);
               <th>이름</th>
               <th>권한</th>
               <th>상태</th>
+              <th>관리</th>
             </tr>
           </thead>
           <tbody>
@@ -144,9 +201,53 @@ onMounted(load);
                 {{ account.role === "REVIEWER" ? "검토자" : "실행 담당자" }}
               </td>
               <td>{{ account.enabled ? "활성" : "비활성" }}</td>
+              <td>
+                <button :disabled="busy" @click="select(account)">
+                  상태 · 이력
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+    <section v-if="selected" class="panel">
+      <h2>{{ selected.username }} 계정 상태</h2>
+      <p class="note">
+        비활성화해도 과거 업무 기록은 보존됩니다. 배정된 미완료 작업은 다른
+        담당자에게 별도로 재배정하세요.
+      </p>
+      <form
+        v-if="selected.username !== user?.username"
+        @submit.prevent="changeStatus"
+      >
+        <fieldset :disabled="busy" class="form-fieldset">
+          <label
+            >계정 상태 변경 사유<textarea
+              v-model="note"
+              required
+              maxlength="2000"
+            /></label
+          ><button :class="selected.enabled ? 'danger' : 'primary'">
+            {{ selected.enabled ? "계정 비활성화" : "계정 재활성화" }}
+          </button>
+        </fieldset>
+      </form>
+      <p v-else class="note">본인의 계정은 비활성화할 수 없습니다.</p>
+      <h3>최근 변경 이력 (최대 100건)</h3>
+      <p v-if="!events.length" class="muted">변경 기록이 없습니다.</p>
+      <div v-for="event in events" :key="event.id" class="evidence-line">
+        <strong>{{
+          event.type === "PASSWORD_CHANGED"
+            ? "비밀번호 변경"
+            : event.type === "DISABLED"
+              ? "비활성화"
+              : "재활성화"
+        }}</strong>
+        <p>{{ event.note }}</p>
+        <small class="muted"
+          >{{ event.actor }} · {{ dateText(event.createdAt) }}</small
+        >
       </div>
     </section></template
   >

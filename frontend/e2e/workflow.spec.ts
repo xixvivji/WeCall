@@ -301,3 +301,93 @@ test("reviewer creates account; operator cannot open account controls", async ({
     page.getByRole("button", { name: "계정 생성", exact: true }),
   ).not.toBeVisible();
 });
+
+test("password change and account status revoke other sessions", async ({
+  page,
+  browser,
+}) => {
+  const username = "security-" + Date.now();
+  const oldPassword = "Initial-" + crypto.randomUUID();
+  const newPassword = "Changed-" + crypto.randomUUID();
+  await page.goto("/");
+  await signIn(page);
+  await page.getByRole("link", { name: "계정 관리", exact: true }).click();
+  await page.getByLabel("새 계정명").fill(username);
+  await page.getByLabel("표시 이름").fill("보안 흐름 검증 계정");
+  await page.getByLabel("초기 비밀번호").fill(oldPassword);
+  await page.getByRole("button", { name: "계정 생성", exact: true }).click();
+  await expect(
+    page.getByRole("cell", { name: username, exact: true }),
+  ).toBeVisible();
+  const first = await browser.newContext(),
+    second = await browser.newContext();
+  try {
+    const a = await first.newPage(),
+      b = await second.newPage();
+    async function enter(p: Page, password: string) {
+      await p.goto("http://127.0.0.1:5173/");
+      await p.getByLabel("계정명", { exact: true }).fill(username);
+      await p.getByLabel("비밀번호", { exact: true }).fill(password);
+      await p.getByRole("button", { name: "로그인", exact: true }).click();
+      await expect(
+        p.getByRole("button", { name: "로그아웃", exact: true }),
+      ).toBeVisible();
+    }
+    await enter(a, oldPassword);
+    await enter(b, oldPassword);
+    await a.getByRole("link", { name: "내 계정", exact: true }).click();
+    await a.screenshot({ path: "/tmp/wecall-account-security.png" });
+    await a.getByLabel("현재 비밀번호", { exact: true }).fill(oldPassword);
+    await a.getByLabel("새 비밀번호", { exact: true }).fill(newPassword);
+    await a.getByLabel("새 비밀번호 확인", { exact: true }).fill(newPassword);
+    await a.getByRole("button", { name: "비밀번호 변경 후 로그아웃" }).click();
+    await expect(
+      a.getByRole("heading", { name: "WeCall에 로그인" }),
+    ).toBeVisible();
+    await expect(a.getByRole("status")).toContainText("새 비밀번호로 로그인");
+    await b.getByRole("button", { name: "검색", exact: true }).click();
+    await expect(
+      b.getByRole("heading", { name: "WeCall에 로그인" }),
+    ).toBeVisible();
+    await enter(b, newPassword);
+    async function status(reason: string, button: string) {
+      await page
+        .getByRole("row")
+        .filter({
+          has: page.getByRole("cell", { name: username, exact: true }),
+        })
+        .getByRole("button", { name: "상태 · 이력" })
+        .click();
+      await page.getByLabel("계정 상태 변경 사유").fill(reason);
+      await page.getByRole("button", { name: button, exact: true }).click();
+      await expect(
+        page.getByRole("heading", { name: username + " 계정 상태" }),
+      ).not.toBeVisible();
+    }
+    await page.reload();
+    await status("합성 계정 접근 중지 검증", "계정 비활성화");
+    await expect(page.getByRole("status")).toContainText(
+      "계정을 비활성화했습니다.",
+    );
+    await b.getByRole("button", { name: "검색", exact: true }).click();
+    await expect(
+      b.getByRole("heading", { name: "WeCall에 로그인" }),
+    ).toBeVisible();
+    await status("합성 계정 재활성 검증", "계정 재활성화");
+    await enter(b, newPassword);
+    await page
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell", { name: username, exact: true }) })
+      .getByRole("button", { name: "상태 · 이력" })
+      .click();
+    await expect(
+      page.getByText("본인 비밀번호 변경", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("합성 계정 접근 중지 검증", { exact: true }),
+    ).toBeVisible();
+  } finally {
+    await first.close();
+    await second.close();
+  }
+});
