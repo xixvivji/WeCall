@@ -36,6 +36,29 @@ public class RecallService {
         ensure(!rows.isEmpty(),HttpStatus.NOT_FOUND,"요청한 사건·조건·판정 결과가 없습니다");
         return rows.getFirst();
     }
+    @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public Map<String,Object> listCases(String query,String status,String sourceType,int page,int size) {
+        ensure(page>=0 && size>=1 && size<=100,HttpStatus.BAD_REQUEST,"page는 0 이상, size는 1~100이어야 합니다");
+        String term=query.strip();
+        ensure(term.length()<=200,HttpStatus.BAD_REQUEST,"검색어는 200자 이하여야 합니다");
+        ensure(status.isEmpty() || Set.of("OPEN","CLOSED").contains(status),HttpStatus.BAD_REQUEST,"사건 상태는 OPEN 또는 CLOSED입니다");
+        ensure(sourceType.isEmpty() || Set.of("SUPPLIER","OFFICIAL","INTERNAL").contains(sourceType),HttpStatus.BAD_REQUEST,"출처 형식을 확인하세요");
+        String where=" WHERE strpos(lower(c.title),lower(?))>0 AND (?='' OR c.status=?) AND (?='' OR c.source_type=?)";
+        Object[] filters={term,status,status,sourceType,sourceType};
+        long total=jdbc.queryForObject("SELECT count(*) FROM recall_case c"+where,Long.class,filters);
+        var params=new ArrayList<Object>(Arrays.asList(filters));params.add(size);params.add((long)page*size);
+        var rows=jdbc.queryForList("""
+            SELECT c.id,c.title,c.status,c.source_type AS "sourceType",c.created_at AS "createdAt",
+                (SELECT count(*) FROM recall_condition k WHERE k.case_id=c.id AND k.status='DRAFT') AS "draftCount",
+                (SELECT count(*) FROM response_task t WHERE t.case_id=c.id AND t.status IN ('OPEN','IN_PROGRESS')) AS "openTaskCount"
+            FROM recall_case c
+            """+where+" ORDER BY c.created_at DESC,c.id DESC LIMIT ? OFFSET ?",params.toArray());
+        return Map.of("items",rows,"page",page,"size",size,"totalElements",total,"totalPages",(total+size-1)/size);
+    }
+    public List<Map<String,Object>> listAssessments(UUID caseId) {
+        getCase(caseId);
+        return jdbc.queryForList("SELECT id,condition_id AS \"conditionId\",dataset_id AS \"datasetId\",created_at AS \"createdAt\" FROM assessment_run WHERE case_id=? ORDER BY created_at DESC,id DESC",caseId);
+    }
     @Transactional
     public Map<String,Object> createCase(NewCase request) {
         UUID id=UUID.randomUUID();

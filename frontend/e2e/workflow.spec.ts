@@ -1,0 +1,203 @@
+import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+const sample = resolve("../samples/recall-001");
+// No credentials, traces, or login screenshots are persisted in test artifacts.
+const credentials: Record<string, string> = { ...process.env } as Record<
+  string,
+  string
+>;
+for (const line of readFileSync(resolve("../.env"), "utf8").split("\n")) {
+  if (line && !line.startsWith("#") && line.includes("=")) {
+    const split = line.indexOf("=");
+    const key = line.slice(0, split);
+    if (!credentials[key]) credentials[key] = line.slice(split + 1);
+  }
+}
+async function signIn(page: Page, operator = false) {
+  await page
+    .getByLabel("계정명", { exact: true })
+    .fill(
+      operator
+        ? credentials.WECALL_BOOTSTRAP_OPERATOR_USERNAME!
+        : credentials.WECALL_USERNAME!,
+    );
+  await page
+    .getByLabel("비밀번호", { exact: true })
+    .fill(
+      operator
+        ? credentials.WECALL_BOOTSTRAP_OPERATOR_PASSWORD!
+        : credentials.WECALL_PASSWORD!,
+    );
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.getByRole("button", { name: "로그아웃" })).toBeAttached();
+}
+
+test("real backend workflow and role boundaries", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await signIn(page);
+  await page.getByRole("link", { name: "데이터 관리", exact: true }).click();
+  await page.getByLabel("데이터 기준 시각").fill("2026-09-09T18:00");
+  for (const [label, file] of [
+    ["상품 CSV", "products"],
+    ["입고 CSV", "receipts"],
+    ["재고 CSV", "inventory"],
+    ["출고 CSV", "shipments"],
+    ["출고·입고 연결 CSV", "shipment_allocations"],
+  ])
+    await page
+      .getByLabel(label!, { exact: true })
+      .setInputFiles(resolve(sample, file + ".csv"));
+  await page.getByRole("button", { name: "데이터 검증 후 등록" }).click();
+  await expect(page.getByRole("status")).toContainText("등록 완료");
+  await page.getByRole("link", { name: "회수 사건", exact: true }).click();
+  const title = "브라우저 검증 " + Date.now();
+  await page.getByRole("button", { name: "새 사건 등록" }).click();
+  await page.getByLabel("사건명", { exact: true }).fill(title);
+  await page
+    .getByLabel("회수 원문")
+    .fill(readFileSync(resolve(sample, "notice.md"), "utf8"));
+  await page.getByRole("button", { name: "사건 등록", exact: true }).click();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await page.getByRole("button", { name: "새 조건 작성" }).click();
+  await page.getByLabel("판정에 사용할 데이터 버전").selectOption({ index: 1 });
+  await page
+    .getByLabel("원문 근거 인용")
+    .fill("제조번호 A01 또는 A02이면서 소비기한이 2026-10-31인 제품");
+  await page
+    .getByLabel("조건 연산", { exact: true })
+    .first()
+    .selectOption("AND");
+  await page.getByLabel("조건 연산", { exact: true }).nth(1).selectOption("IN");
+  await page.getByLabel("조건 값", { exact: true }).fill("A01,A02");
+  await page.getByRole("button", { name: "하위 조건 추가" }).click();
+  await page
+    .getByLabel("조건 항목", { exact: true })
+    .nth(1)
+    .selectOption("EXPIRY_DATE");
+  await page.getByLabel("조건 값", { exact: true }).nth(1).fill("2026-10-31");
+  for (const id of ["P1", "P2", "P3"]) {
+    await page
+      .getByLabel(id + " 연결 검토", { exact: true })
+      .selectOption(id === "P1" ? "MATCHED" : "EXCLUDED");
+    await page
+      .getByLabel(id + " 검토 근거", { exact: true })
+      .fill(id === "P1" ? "제조사·규격 확인" : "별도 규격·제조사 확인");
+  }
+  await page.getByRole("button", { name: "조건 초안 저장" }).click();
+  await expect(
+    page.getByText("조건을 승인했습니다.", { exact: false }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "이 조건으로 판정 실행" }),
+  ).not.toBeVisible();
+  await page
+    .getByLabel("원문, 데이터 버전, 상품 연결과 조건을 확인했습니다.")
+    .check();
+  await page.getByRole("button", { name: "조건 승인", exact: true }).click();
+  await page.getByRole("button", { name: "이 조건으로 판정 실행" }).click();
+  await expect(page.locator(".metric strong")).toHaveText([
+    "110",
+    "110",
+    "30",
+    "60",
+    "10",
+    "20",
+  ]);
+  await expect(
+    page
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell", { name: "S2", exact: true }) }),
+  ).toContainText("10");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "/tmp/wecall-impact-desktop.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "대응 작업", exact: true }).click();
+  await page.getByRole("button", { name: "작업 만들기" }).click();
+  await page.getByLabel("작업 제목").fill("합성 재고 격리 확인");
+  await page
+    .getByLabel("담당자", { exact: true })
+    .selectOption(credentials.WECALL_BOOTSTRAP_OPERATOR_USERNAME!);
+  await page
+    .getByLabel("작업 지시")
+    .fill("합성 시연용 작업. 실제 조치 기록이 아닙니다.");
+  await page.getByRole("button", { name: "작업 등록", exact: true }).click();
+  await page.getByRole("button", { name: "작업 상세" }).click();
+  await page.getByLabel("상태 변경 사유").fill("가상 작업 시작");
+  await page.getByRole("button", { name: "작업 시작", exact: true }).click();
+  await page
+    .getByLabel("처리 증빙", { exact: true })
+    .fill("합성 데이터 시연: 재고 격리 확인. 실제 작업 아님.");
+  await page.getByRole("button", { name: "증빙 제출" }).click();
+  await page.getByLabel("증빙 검토 사유").fill("합성 근거 검토");
+  await page.getByRole("button", { name: "증빙 승인", exact: true }).click();
+  await page.getByLabel("상태 변경 사유").fill("시연 완료");
+  await page.getByRole("button", { name: "검토 후 작업 완료" }).click();
+  await expect(page.getByRole("button", { name: "작업 재개" })).toBeVisible();
+  await page.getByRole("button", { name: "종료 점검", exact: true }).click();
+  await expect(
+    page.getByText("확인 필요 출고 수량이 남아 있습니다", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "최종 검토 후 사건 종료" }),
+  ).toBeDisabled();
+  await page.getByRole("link", { name: "← 사건 목록" }).click();
+  await page.getByLabel("사건명 검색").fill(title);
+  await page.getByRole("button", { name: "검색", exact: true }).click();
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await page.getByRole("link", { name: title, exact: true }).click();
+  await page.getByRole("button", { name: "로그아웃" }).click();
+  await signIn(page, true);
+  await expect(
+    page.getByRole("button", { name: "새 조건 작성" }),
+  ).not.toBeVisible();
+  await page.getByRole("button", { name: "대응 작업", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "작업 만들기" }),
+  ).not.toBeVisible();
+  await page.getByRole("button", { name: "작업 상세" }).click();
+  await expect(
+    page.getByRole("button", { name: "작업 재개" }),
+  ).not.toBeVisible();
+  await page.getByRole("link", { name: "← 사건 목록" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("heading", { name: "회수 사건", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+  await page.screenshot({
+    path: "/tmp/wecall-cases-mobile.png",
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
+});
+
+test("invalid login and session expiry return to login", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("계정명", { exact: true }).fill("unknown-account");
+  await page
+    .getByLabel("비밀번호", { exact: true })
+    .fill("invalid-not-a-real-password");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("계정명 또는 비밀번호");
+  await signIn(page);
+  await page.getByRole("link", { name: "회수 사건", exact: true }).click();
+  await context.clearCookies();
+  await page.getByRole("button", { name: "검색", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "WeCall에 로그인" }),
+  ).toBeVisible();
+});

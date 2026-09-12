@@ -16,6 +16,27 @@ import java.util.*;
 public class DatasetService {
     private final JdbcTemplate jdbc;
     public DatasetService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private void validPage(int page,int size) {
+        if(page<0 || size<1 || size>100) throw new com.wecall.recall.RecallService.Failure(org.springframework.http.HttpStatus.BAD_REQUEST,"page는 0 이상, size는 1~100이어야 합니다");
+    }
+    @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public Map<String,Object> list(int page,int size) {
+        validPage(page,size);
+        long total=jdbc.queryForObject("SELECT count(*) FROM dataset",Long.class);
+        var rows=jdbc.queryForList("SELECT id,as_of AS \"asOf\",created_at AS \"createdAt\" FROM dataset ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",size,(long)page*size);
+        return Map.of("items",rows,"page",page,"size",size,"totalElements",total,"totalPages",(total+size-1)/size);
+    }
+    @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public Map<String,Object> products(UUID id,String query,int page,int size) {
+        validPage(page,size);
+        if(query.length()>200) throw new com.wecall.recall.RecallService.Failure(org.springframework.http.HttpStatus.BAD_REQUEST,"검색어는 200자 이하여야 합니다");
+        if(jdbc.queryForObject("SELECT count(*) FROM dataset WHERE id=?",Long.class,id)==0)
+            throw new com.wecall.recall.RecallService.Failure(org.springframework.http.HttpStatus.NOT_FOUND,"데이터 버전이 없습니다");
+        String where=" WHERE dataset_id=? AND (strpos(lower(name),lower(?))>0 OR strpos(lower(id),lower(?))>0)";
+        long total=jdbc.queryForObject("SELECT count(*) FROM product"+where,Long.class,id,query.strip(),query.strip());
+        var rows=jdbc.queryForList("SELECT id,name,manufacturer,pack_size AS \"packSize\",unit FROM product"+where+" ORDER BY id LIMIT ? OFFSET ?",id,query.strip(),query.strip(),size,(long)page*size);
+        return Map.of("items",rows,"page",page,"size",size,"totalElements",total,"totalPages",(total+size-1)/size);
+    }
     private static final Map<String, String> HEADERS = Map.of(
         "products", "product_id,name,manufacturer,pack_size,unit",
         "receipts", "receipt_id,product_id,lot_number,expiry_date,received_quantity,received_at",

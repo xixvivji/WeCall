@@ -12,6 +12,13 @@ import static com.wecall.recall.RecallModels.*;
 public class RecallController {
     private final RecallService service;
     public RecallController(RecallService service) { this.service=service; }
+    @GetMapping
+    public Map<String,Object> list(@RequestParam(defaultValue="") String q,@RequestParam(defaultValue="") String status,
+        @RequestParam(defaultValue="") String sourceType,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
+        return service.listCases(q,status,sourceType,page,size);
+    }
+    @GetMapping("/{caseId}/assessments")
+    public List<Map<String,Object>> assessments(@PathVariable UUID caseId) {return service.listAssessments(caseId);}
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
     public Map<String,Object> create(@Valid @RequestBody NewCase body) { return service.createCase(body); }
     @GetMapping("/{caseId}")
