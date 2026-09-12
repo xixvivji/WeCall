@@ -85,3 +85,7 @@ GET `/api/v1/recalls/{caseId}/evidence`는 `status`(빈 값/PENDING/APPROVED/REJ
 ## 판정 CSV
 
 영향 조회의 재고 CSV 다운로드·출고 CSV 다운로드 버튼은 현재 선택한 저장 판정 ID를 고정해 요청한다. 이전 판정을 선택하면 이전 결과를 반환한다. 실패 시 오류를 표시하며 인증 만료 시 로그인 화면으로 돌아간다. 파일에는 판정·조건·데이터 ID를 포함한다. 자세한 형식은 [recall-api.md](recall-api.md)를 따른다.
+
+## 데이터 준비 상태
+
+데이터 관리 목록의 준비 상태 점검은 `/datasets/{id}/readiness`로 이동한다. 버전별 건수·입고 누락·출고 연결 요약과 문제 기록의 페이지 목록을 제공하며 두 역할 모두 조회할 수 있다. 회수 대상 판정과 데이터 누락 점검을 구분한다. API 및 집계 기준은 [csv-import.md](csv-import.md)를 따른다.

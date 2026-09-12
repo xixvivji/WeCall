@@ -13,7 +13,7 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
 import java.nio.file.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WithMockUser(username="test-reviewer",roles="REVIEWER")
@@ -35,6 +35,39 @@ class DatasetImportTests {
         return req;
     }
     void empty() { assertThat(jdbc.queryForObject("SELECT count(*) FROM dataset",Long.class)).isZero(); }
+    @Test void readinessPreservesDatasetBoundaryAndPartialLinks() throws Exception {
+        mvc.perform(request("","","")).andExpect(status().isCreated());
+        UUID id=jdbc.queryForObject("SELECT id FROM dataset",UUID.class);
+        mvc.perform(request("","","")).andExpect(status().isCreated());
+        String base="/api/v1/datasets/"+id+"/readiness";
+        mvc.perform(get(base)).andExpect(status().isOk()).andExpect(jsonPath("$.productCount").value(3))
+            .andExpect(jsonPath("$.receiptCount").value(7)).andExpect(jsonPath("$.receipts.missingEither").value(1))
+            .andExpect(jsonPath("$.shipments.partialCount").value(1)).andExpect(jsonPath("$.shipments.fullyLinkedCount").value(3))
+            .andExpect(jsonPath("$.shipments.unlinkedQuantity").value(10));
+        mvc.perform(get(base+"/issues?type=receipts")).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value("R4"));
+        mvc.perform(get(base+"/issues?type=shipments")).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+            .andExpect(jsonPath("$.items[0].id").value("S2")).andExpect(jsonPath("$.items[0].linked").value(20)).andExpect(jsonPath("$.items[0].unlinked").value(10));
+        mvc.perform(get(base).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())).andExpect(status().isUnauthorized());
+        mvc.perform(get(base).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("operator").roles("OPERATOR"))).andExpect(status().isOk());
+        mvc.perform(get(base+"/issues?size=0")).andExpect(status().isBadRequest());
+        mvc.perform(get(base+"/issues?type=bad")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/datasets/"+UUID.randomUUID()+"/readiness")).andExpect(status().isNotFound());
+    }
+    @Test void readinessCountsOverlappingMissingFieldsAndZeroShipmentsSeparately() throws Exception {
+        mvc.perform(request("","","")).andExpect(status().isCreated());
+        UUID id=jdbc.queryForObject("SELECT id FROM dataset",UUID.class);
+        jdbc.update("UPDATE receipt SET expiry_date=NULL WHERE dataset_id=? AND id IN ('R4','R5')",id);
+        jdbc.update("DELETE FROM shipment_allocation WHERE dataset_id=? AND shipment_id IN ('S1','S3')",id);
+        jdbc.update("UPDATE shipment SET quantity=0 WHERE dataset_id=? AND id='S3'",id);
+        String base="/api/v1/datasets/"+id+"/readiness";
+        mvc.perform(get(base)).andExpect(status().isOk()).andExpect(jsonPath("$.receipts.missingLot").value(1))
+            .andExpect(jsonPath("$.receipts.missingExpiry").value(2)).andExpect(jsonPath("$.receipts.missingEither").value(2))
+            .andExpect(jsonPath("$.shipments.unlinkedCount").value(1)).andExpect(jsonPath("$.shipments.partialCount").value(1))
+            .andExpect(jsonPath("$.shipments.zeroQuantityCount").value(1)).andExpect(jsonPath("$.shipments.unlinkedQuantity").value(50));
+        mvc.perform(get(base+"/issues?type=receipts&size=1&page=1")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalElements").value(2)).andExpect(jsonPath("$.totalPages").value(2)).andExpect(jsonPath("$.items[0].id").value("R5"));
+        mvc.perform(get(base+"/issues?type=shipments&page=10")).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
+    }
     @Test void storesSampleAndPreservesUnknowns() throws Exception {
         mvc.perform(request("","","")).andExpect(status().isCreated()).andExpect(jsonPath("$.counts.products").value(3))
             .andExpect(jsonPath("$.counts.receipts").value(7)).andExpect(jsonPath("$.counts.shipments").value(4))

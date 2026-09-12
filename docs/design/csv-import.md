@@ -60,3 +60,13 @@ JDBC + Flyway로 일괄 등록을 구현했다. JPA 엔터티는 아직 도입�
 
 Docker 실행 상태에서 `cd backend && ./gradlew test bootJar`.
 Testcontainers가 별도 PostgreSQL을 만들기 때문에 개발 DB 데이터는 테스트에서 변경하지 않는다.
+
+## 데이터 준비 상태 점검
+
+두 역할 모두 `GET /api/v1/datasets/{id}/readiness`로 해당 버전의 상품·입고·재고·출고·연결 기록 건수와 누락 요약을 조회한다. 제조번호·소비기한 누락은 각각 집계하고 missingEither는 둘 중 하나 이상 누락된 입고의 중복 없는 건수다.
+
+출고마다 같은 데이터 버전의 연결 수량을 먼저 합산한다. 양수 출고는 연결 없음(0), 일부 연결(0 < 연결 < 출고), 전체 연결로 구분하며 0수량 출고는 별도 집계한다. unlinkedQuantity는 출고 수량에서 실제 연결 합계를 뺀 수량의 합(EA)이다. 존재하지 않는 참조·음수·과다 연결은 기존 CSV 등록 검증에서 거부한다.
+
+`GET /api/v1/datasets/{id}/readiness/issues?type=receipts|shipments&page=0&size=20`은 누락 입고 또는 연결 미확인 수량이 양수인 출고만 반환한다. 기본 type은 receipts, size는 1~100이며 ID 오름차순이다. items/page/size/totalElements/totalPages를 반환한다. 잘못된 조건은 400, 없는 버전은 404다. 요약과 각 목록 요청은 읽기 전용 DB 스냅샷에서 조회하며 데이터 값을 변경하지 않는다.
+
+프론트의 데이터 관리 → 준비 상태 점검에서 해당 버전과 기준 시각, 누락·연결 현황, 페이지별 상세 기록을 확인한다. 데이터 누락은 회수 대상 판정이 아니며 실제 판정은 승인된 회수 조건에 따른다. 입고 증거 승인으로 생성한 보완 버전도 독립적으로 조회한다. 출고 연결 보완은 실제 기록을 확인한 새 CSV 버전 등록으로 처리한다.
