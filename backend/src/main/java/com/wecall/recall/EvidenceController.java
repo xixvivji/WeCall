@@ -14,6 +14,9 @@ public class EvidenceController {
     public EvidenceController(EvidenceService service) { this.service=service; }
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
     public Map<String,Object> create(@PathVariable UUID caseId,@Valid @RequestBody NewEvidence body) { return service.create(caseId,body); }
+    @GetMapping
+    public Map<String,Object> list(@PathVariable UUID caseId,@RequestParam(defaultValue="") String status,
+        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {return service.list(caseId,status,page,size);}
     @GetMapping("/{evidenceId}")
     public Map<String,Object> get(@PathVariable UUID caseId,@PathVariable UUID evidenceId) { return service.get(caseId,evidenceId); }
     @PostMapping("/{evidenceId}/approval")
