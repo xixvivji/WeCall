@@ -116,6 +116,18 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     path: "/tmp/wecall-impact-desktop.png",
     fullPage: true,
   });
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "출고 CSV 다운로드" }).click();
+  const csvDownload = await downloaded;
+  expect(csvDownload.suggestedFilename()).toMatch(
+    /^assessment-.*-shipments\.csv$/,
+  );
+  const csvStream = await csvDownload.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of csvStream!) chunks.push(Buffer.from(chunk));
+  expect(Buffer.concat(chunks).toString("utf8")).toContain(
+    "needs_review_ea,unlinked_ea",
+  );
   const oldRun = await page.getByLabel("조회·작업 기준 판정").inputValue();
   await page.getByRole("button", { name: "입고 증거", exact: true }).click();
   const evidence = JSON.parse(
