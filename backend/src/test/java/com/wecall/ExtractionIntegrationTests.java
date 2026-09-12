@@ -115,7 +115,7 @@ class ExtractionIntegrationTests {
     }
     @Test void mockResultsRequireExplicitOptIn() {
         UUID id=enqueue();var work=jobs.claim().orElseThrow();
-        var strict=new ExtractionClient(json,"http://127.0.0.1:"+SERVER.getAddress().getPort(),"test-service-token",false,1000,1000);
+        var strict=new FastApiExtractionClient(json,"http://127.0.0.1:"+SERVER.getAddress().getPort(),"test-service-token",false,1000,1000);
         assertThatThrownBy(()->strict.extract(id,work.source(),work.sha())).isInstanceOf(ExtractionClient.Failed.class).hasMessage("MOCK_RESPONSE_DISABLED");
     }
     @Test void activeJobsAreNotDuplicatedOrDiscardedAndTerminalReviewBlocksClosure() throws Exception {
