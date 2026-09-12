@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from "vue";
 import { api, user, label, errorText, dateText, type Assessment } from "../api";
 const props = defineProps<{
   caseId: string;
+  initialTask?: string;
   closed: boolean;
   assessment?: Assessment;
 }>();
@@ -112,6 +113,7 @@ async function act(path: string, body: Record<string, unknown>) {
 }
 onMounted(async () => {
   await load();
+  if (props.initialTask) await select(props.initialTask);
   if (reviewer.value)
     try {
       users.value = await api("/api/users");

@@ -391,3 +391,36 @@ test("password change and account status revoke other sessions", async ({
     await second.close();
   }
 });
+
+test("workspace filters tasks and opens their existing detail", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await signIn(page);
+  await page.getByRole("link", { name: "업무 대시보드", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "업무 대시보드", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("작업 범위").selectOption("all");
+  await page.getByLabel("작업 상태", { exact: true }).selectOption("COMPLETED");
+  await page.getByLabel("사건·작업 검색").fill("합성 재고 격리 확인");
+  await page.getByRole("button", { name: "작업 조회" }).click();
+  await page
+    .getByRole("link", { name: "작업 열기", exact: true })
+    .first()
+    .click();
+  await expect(page.getByRole("button", { name: "상세 닫기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "작업 재개" })).toBeVisible();
+  await page.getByRole("link", { name: "업무 대시보드", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("button", { name: "작업 조회" })).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "/tmp/wecall-workspace-mobile.png",
+    fullPage: true,
+  });
+});

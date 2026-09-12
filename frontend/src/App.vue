@@ -114,6 +114,9 @@ async function signOut() {
         <RouterLink v-if="user.roles.includes('REVIEWER')" to="/users"
           ><Users :size="20" />계정 관리</RouterLink
         >
+        <RouterLink to="/workspace"
+          ><ClipboardList :size="20" />업무 대시보드</RouterLink
+        >
         <RouterLink to="/account"><KeyRound :size="20" />내 계정</RouterLink>
       </nav>
       <div class="sidebar-bottom">
