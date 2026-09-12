@@ -43,3 +43,17 @@ DB 작업 선점 트랜잭션 후 외부 호출을 수행한다. 연결 제한 2
 정상 응답과 제한 이내의 잘못된 성공 응답은 원문 그대로 보존한다. HTTP 오류·연결 오류·과대 응답은 원문을 보존하지 않는다. API 조회에 원문과 추출 결과가 포함되므로 운영 배포 시 접근·보존 정책을 추가해야 한다.
 
 검증: PostgreSQL 통합 테스트에서 비동기 상태, 승인 분리, 잘못된 ID·해시·조건·인용, 응답 크기, 타임아웃, 모의 응답 차단, 중복 요청, 종료 차단, 중단 복구, 전환 롤백, 권한을 확인한다. Python 테스트는 서비스 인증·기본 비활성화·정확한 fixture 입력 제한을 확인한다.
+
+## 교체 가능한 백엔드 호출 인터페이스
+
+`ExtractionClient`는 모델이나 HTTP 라이브러리에 의존하지 않는 Java 인터페이스다.
+
+```java
+Response extract(UUID requestId, String source, String sha);
+```
+
+입력은 작업 ID·회수 원문 스냅샷·UTF-8 SHA-256이다. 반환은 기존 `ExtractionModels.Result`와 감사용 원본 응답이며 오류는 `ExtractionClient.Failed`의 코드로 전달한다. 구현체는 작업 ID·해시·조건 AST·인용문 검증과 응답 크기 제한을 책임진다. 승인·재판정·데이터 접근은 이 인터페이스의 책임이 아니다.
+
+기존 HTTP 코드는 `FastApiExtractionClient implements ExtractionClient`로 분리했다. 워커와 결과 저장 서비스는 인터페이스에만 의존한다. FastAPI 내부 모델만 바꾸고 v1 HTTP 계약을 유지하면 Java 변경이 필요 없다. 통신 방식까지 바꾸면 인터페이스 구현체를 교체하고 Spring 빈을 하나만 등록한다. 검증·타임아웃·오류 계약도 새 구현체에서 유지해야 한다.
+
+이번 변경은 호출 경계를 분리한 것이며 실제 AI 모델이나 신규 외부 호출을 추가하지 않는다. 기존 FastAPI 연동과 명시적 fixture 시연은 유지한다. 기본 provider는 여전히 disabled다. 내부망 강제·네트워크 반출 차단은 별도 작업이다.
