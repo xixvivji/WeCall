@@ -111,3 +111,17 @@ sourceType: SUPPLIER / OFFICIAL / INTERNAL. 제목은 200자, 원문은 100000�
 ## 사건 목록과 판정 이력 조회
 
 GET `/api/v1/recalls`와 GET `/api/v1/recalls/{caseId}/assessments`를 지원한다. 검색·페이지 처리 및 데이터 조회 계약은 [Vue 업무 화면·조회 API](frontend-workspace.md)를 참고한다.
+
+## 판정 결과 CSV 다운로드
+
+`GET /api/v1/recalls/{caseId}/assessments/{runId}/export.csv?type=inventory|shipments`
+
+두 역할 모두 로그인 후 조회할 수 있다. 지정한 사건에 속한 저장 판정만 반환하며 다른 사건의 판정은 404, 잘못된 유형은 400이다. 재판정이나 업무 상태 변경 없이 선택한 판정 스냅샷을 사용한다.
+
+- 재고: 사건·판정·조건·데이터 ID, 재고·입고 ID, 창고, 수량(EA), 판정 당시 보류 상태, 대상 판정.
+- 출고: 사건·판정·조건·데이터 ID, 출고·주문 ID, 전체·대상·비대상·확인 필요·연결 미확인 수량(EA).
+- `unlinked_ea`는 `needs_review_ea`에 포함되는 수량이다. 둘을 합산하지 않는다. 현재 작업 상태나 실제 회수 완료를 나타내지 않는다.
+
+UTF-8 BOM과 RFC4180 CSV 형식을 사용한다. 문자열의 수식 시작 문자(앞 공백 제거 후 =, +, -, @) 또는 탭·줄바꿈 앞에는 작은따옴표를 붙여 스프레드시트 수식 실행을 방지한다. 이 경우 내보낸 표시 문자열은 원문과 다를 수 있으며 DB 원본은 바꾸지 않는다. ID는 각 행에 포함되며 빈 결과도 헤더를 반환한다. 응답은 attachment와 Cache-Control: no-store를 사용한다.
+
+Vue 사건 상세의 영향 조회에서 선택 판정의 재고 CSV·출고 CSV를 다운로드한다. 내려받은 파일은 사용자 기기에 저장되며 별도 외부 서비스로 전송하지 않는다.

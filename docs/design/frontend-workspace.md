@@ -81,3 +81,7 @@ GET `/api/v1/recalls/{caseId}/evidence`는 `status`(빈 값/PENDING/APPROVED/REJ
 ## 업무 대시보드
 
 `/#/workspace`에 사건 현황과 내 할 일을 제공한다. 검토자는 전체 작업과 재배정 필요 작업을 조회할 수 있다. 상태·사건명·작업명 필터와 페이지 이동을 제공하며 작업 열기로 기존 사건의 해당 작업 상세에 바로 진입한다. 집계 정의와 권한은 [workspace-api.md](workspace-api.md)를 따른다.
+
+## 판정 CSV
+
+영향 조회의 재고 CSV 다운로드·출고 CSV 다운로드 버튼은 현재 선택한 저장 판정 ID를 고정해 요청한다. 이전 판정을 선택하면 이전 결과를 반환한다. 실패 시 오류를 표시하며 인증 만료 시 로그인 화면으로 돌아간다. 파일에는 판정·조건·데이터 ID를 포함한다. 자세한 형식은 [recall-api.md](recall-api.md)를 따른다.

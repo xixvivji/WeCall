@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import {
   api,
+  downloadAssessment,
   user,
   errorText,
   label,
@@ -64,6 +65,19 @@ async function loadRun() {
     }
   } catch (e) {
     if (generation === runGeneration) error.value = errorText(e);
+  }
+}
+async function exportResult(type: "inventory" | "shipments") {
+  if (!assessment.value || busy.value) return;
+  const selectedRun = assessment.value.id;
+  busy.value = true;
+  error.value = "";
+  try {
+    await downloadAssessment(id, selectedRun, type);
+  } catch (e) {
+    error.value = errorText(e);
+  } finally {
+    busy.value = false;
   }
 }
 async function approve(condition: Condition) {
@@ -249,6 +263,17 @@ onMounted(load);
       </section>
       <template v-if="tab === 'impact' && assessment"
         ><section class="panel">
+          <div class="inline">
+            <button :disabled="busy" @click="exportResult('inventory')">
+              재고 CSV 다운로드</button
+            ><button :disabled="busy" @click="exportResult('shipments')">
+              출고 CSV 다운로드
+            </button>
+          </div>
+          <p class="note">
+            현재 선택한 판정의 저장 결과입니다. 출고의 연결 미확인 수량은 확인
+            필요 수량에 포함되며, 현재 작업 상태를 뜻하지 않습니다.
+          </p>
           <h2>
             재고 영향
             <small class="muted">수량 단위 EA · 판정 시점의 결과</small>

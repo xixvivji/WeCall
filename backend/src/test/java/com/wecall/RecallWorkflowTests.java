@@ -58,6 +58,34 @@ class RecallWorkflowTests {
     JsonNode run(String conditionId,int status) throws Exception {
         return postJson("/api/v1/recalls/"+caseId+"/assessments",Map.of("conditionId",conditionId),status);
     }
+    @Test void csvExportPreservesSelectedRunAndNeutralizesSpreadsheetFormulas() throws Exception {
+        jdbc.update("UPDATE inventory SET warehouse=? WHERE dataset_id=?", "=SUM(1,2)\n창고",datasetId);
+        String conditionId=createCondition(condition());approve(conditionId);
+        String runId=run(conditionId,201).get("id").asText();
+        String base="/api/v1/recalls/"+caseId+"/assessments/"+runId+"/export.csv";
+        byte[] bytes=mvc.perform(get(base).param("type","inventory")).andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("Content-Disposition","attachment; filename=\"assessment-"+runId+"-inventory.csv\""))
+            .andReturn().getResponse().getContentAsByteArray();
+        String csv=new String(bytes,java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(csv).startsWith("\ufeff");
+        try(var parser=CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).get().parse(new java.io.StringReader(csv.substring(1)))) {
+            var rows=parser.getRecords();assertThat(rows).isNotEmpty();
+            assertThat(rows.getFirst().get("warehouse")).isEqualTo("'=SUM(1,2)\n창고");
+            assertThat(rows.getFirst().get("assessment_id")).isEqualTo(runId);
+            assertThat(rows.getFirst().get("dataset_id")).isEqualTo(datasetId.toString());
+        }
+        var result=mvc.perform(get(base).param("type","shipments")).andExpect(status().isOk()).andReturn().getResponse();
+        try(var parser=CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).get().parse(new java.io.StringReader(new String(result.getContentAsByteArray(),java.nio.charset.StandardCharsets.UTF_8).substring(1)))) {
+            var row=parser.getRecords().stream().filter(r->r.get("shipment_id").equals("S2")).findFirst().orElseThrow();
+            assertThat(row.get("unlinked_ea")).isEqualTo("10");assertThat(row.get("needs_review_ea")).isEqualTo("10");
+        }
+        run(conditionId,201);
+        assertThat(mvc.perform(get(base).param("type","inventory")).andReturn().getResponse().getContentAsByteArray()).isEqualTo(bytes);
+        mvc.perform(get(base).param("type","invalid")).andExpect(status().isBadRequest());
+        mvc.perform(get(base.replace(caseId,UUID.randomUUID().toString())).param("type","inventory")).andExpect(status().isNotFound());
+        mvc.perform(get(base).param("type","inventory").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())).andExpect(status().isUnauthorized());
+        mvc.perform(get(base).param("type","inventory").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("operator").roles("OPERATOR"))).andExpect(status().isOk());
+    }
     @Test void sampleMatchesManuallyAuthoredGoldenFilesAndPersistsResult() throws Exception {
         String conditionId=createCondition(condition()); approve(conditionId);
         JsonNode result=run(conditionId,201);

@@ -229,3 +229,35 @@ export async function changeOwnPassword(
   sessionNotice.value = "비밀번호가 변경됐습니다. 새 비밀번호로 로그인하세요.";
   user.value = null;
 }
+
+export async function downloadAssessment(
+  caseId: string,
+  runId: string,
+  type: "inventory" | "shipments",
+) {
+  const response = await fetch(
+    `/api/v1/recalls/${encodeURIComponent(caseId)}/assessments/${encodeURIComponent(runId)}/export.csv?type=${type}`,
+    { credentials: "same-origin" },
+  );
+  if (!response.ok) {
+    if (response.status === 401) {
+      user.value = null;
+      csrf = null;
+    }
+    const data = await response.json().catch(() => null);
+    throw new Error(
+      data?.message ||
+        (response.status === 401
+          ? "로그인이 필요합니다."
+          : "판정 결과를 다운로드하지 못했습니다."),
+    );
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `assessment-${runId}-${type}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
