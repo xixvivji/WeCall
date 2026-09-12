@@ -23,7 +23,7 @@ const id = String(useRoute().params.id),
   runs = ref<RunRow[]>([]),
   assessment = ref<Assessment>(),
   runId = ref(""),
-  tab = ref("overview"),
+  tab = ref(useRoute().query.task ? "tasks" : "overview"),
   error = ref(""),
   success = ref(""),
   busy = ref(false),
@@ -370,6 +370,7 @@ onMounted(load);
       <Tasks
         v-if="tab === 'tasks'"
         :case-id="id"
+        :initial-task="String($route.query.task || '')"
         :closed="closed"
         :assessment="assessment"
       />

@@ -58,6 +58,36 @@ class AuthSecurityTests {
     }
     UUID caseId() {return (UUID)recalls.createCase(new RecallModels.NewCase("인증 검증 사건",RecallModels.SourceType.INTERNAL,"긴급 보류")).get("id");}
     Map<String,Object> task(UUID caseId,String assignee) {return tasks.create(caseId,new NewTask(TaskType.SALES_HOLD,TargetType.CASE,null,null,"판매보류","지시 확인",assignee,"trusted-fixture"));}
+    @Test void dashboardCountsOnlyLatestAssessmentOfOpenCases() throws Exception {
+        UUID c=caseId(),d=UUID.randomUUID(),condition=UUID.randomUUID();
+        jdbc.update("INSERT INTO dataset(id,as_of) VALUES (?,now())",d);
+        jdbc.update("INSERT INTO recall_condition(id,case_id,dataset_id,version,definition) VALUES (?,?,?,1,'{}')",condition,c,d);
+        jdbc.update("INSERT INTO assessment_run(id,case_id,condition_id,dataset_id,result,created_at) VALUES (?,?,?,?,?::jsonb,now()-interval '1 minute')",UUID.randomUUID(),c,condition,d,"{\"inventoryTotals\":{\"needsReview\":10},\"shipmentTotals\":{\"needsReview\":0}}");
+        var reviewer=login("auth-reviewer");
+        mvc.perform(get("/api/v1/workspace/summary").session(reviewer.session())).andExpect(status().isOk()).andExpect(jsonPath("$.reviewCases").value(1));
+        jdbc.update("INSERT INTO assessment_run(id,case_id,condition_id,dataset_id,result) VALUES (?,?,?,?,?::jsonb)",UUID.randomUUID(),c,condition,d,"{\"inventoryTotals\":{\"needsReview\":0},\"shipmentTotals\":{\"needsReview\":0}}");
+        mvc.perform(get("/api/v1/workspace/summary").session(reviewer.session())).andExpect(status().isOk()).andExpect(jsonPath("$.reviewCases").value(0)).andExpect(jsonPath("$.unassessedCases").value(0));
+        jdbc.update("UPDATE recall_case SET status='CLOSED',closed_at=now() WHERE id=?",c);
+        mvc.perform(get("/api/v1/workspace/summary").session(reviewer.session())).andExpect(status().isOk()).andExpect(jsonPath("$.openCases").value(0));
+    }
+    @Test void workspaceScopesPaginationAndReassignmentRespectIdentity() throws Exception {
+        UUID c=caseId();task(c,"auth-operator");task(c,"auth-other");task(c,null);
+        var operator=login("auth-operator");
+        mvc.perform(get("/api/v1/workspace/tasks").session(operator.session())).andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.items[0].assignee").value("auth-operator"));
+        mvc.perform(get("/api/v1/workspace/tasks?scope=all").session(operator.session())).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/workspace/tasks?scope=reassign").session(operator.session())).andExpect(status().isForbidden());
+        var reviewer=login("auth-reviewer");
+        jdbc.update("UPDATE app_user SET enabled=false WHERE username='auth-other'");
+        mvc.perform(get("/api/v1/workspace/tasks?scope=reassign&size=1").session(reviewer.session())).andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalElements").value(2)).andExpect(jsonPath("$.totalPages").value(2)).andExpect(jsonPath("$.items.length()").value(1));
+        mvc.perform(get("/api/v1/workspace/tasks?scope=all&q=없는작업").session(reviewer.session())).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/api/v1/workspace/tasks?size=0").session(reviewer.session())).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/workspace/summary").session(operator.session())).andExpect(status().isOk())
+            .andExpect(jsonPath("$.openCases").value(1)).andExpect(jsonPath("$.reviewCases").value(0))
+            .andExpect(jsonPath("$.unassessedCases").value(1)).andExpect(jsonPath("$.openTasks").value(3)).andExpect(jsonPath("$.myTasks").value(1));
+        mvc.perform(get("/api/v1/workspace/tasks")).andExpect(status().isUnauthorized());
+    }
     @Test void passwordChangeRevokesEverySessionAndPreservesAuditWithoutSecrets() throws Exception {
         var a=login("auth-operator");var b=login("auth-operator");
         postJson(a,"/api/auth/password",Map.of("currentPassword","wrong","newPassword","replacement-password-123"),400);
