@@ -73,6 +73,20 @@ class ReceiptEvidenceTests {
     }
     void singleDataset() { assertThat(jdbc.queryForObject("SELECT count(*) FROM dataset",Long.class)).isEqualTo(1); }
 
+    @Test @WithMockUser(username="test-operator",roles="OPERATOR")
+    void evidenceListIsPagedFilteredAndCaseScoped() throws Exception {
+        var a=create(proposal());var b=create(proposal());
+        jdbc.update("UPDATE receipt_evidence SET created_at='2026-09-09T00:00:00Z' WHERE case_id=?",caseId);
+        var first=mvc.perform(get(prefix()).param("size","1")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalElements").value(2)).andReturn().getResponse();
+        String firstId=json.readTree(first.getContentAsByteArray()).get("items").get(0).get("id").asText();
+        mvc.perform(get(prefix()).param("size","1").param("page","1")).andExpect(jsonPath("$.items[0].id").value(firstId.equals(a.get("id").asText())?b.get("id").asText():a.get("id").asText()));
+        mvc.perform(get(prefix()).param("status","APPROVED")).andExpect(jsonPath("$.items").isEmpty());
+        mvc.perform(get(prefix()).param("status","OTHER")).andExpect(status().isBadRequest());
+        mvc.perform(get(prefix()).param("size","101")).andExpect(status().isBadRequest());
+        mvc.perform(get(prefix()).param("page","-1")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/recalls/"+UUID.randomUUID()+"/evidence")).andExpect(status().isNotFound());
+    }
     @Test void approvalMatchesAfterGoldenResultsWithoutInventingLinks() throws Exception {
         JsonNode created=create(proposal());
         assertThat(created.get("status").asText()).isEqualTo("PENDING");

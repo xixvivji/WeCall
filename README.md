@@ -31,6 +31,7 @@ Spring Boot는 업무 로직·조건 판정·승인·데이터 저장을 맡고,
 - [사건 종료 점검·승인·재개 API](docs/design/closure-api.md)
 - [FastAPI 조건 추출 연동·모의 시연](docs/design/ai-extraction-api.md)
 - [Vue 업무 화면·실행 방법·조회 API](docs/design/frontend-workspace.md)
+- [AI 데이터 처리 경계와 미구현 보안 통제](docs/design/ai-data-boundary.md)
 - [로그인·계정·역할별 권한](docs/design/auth-api.md)
 - [합성 회수 사건·CSV·정답표](samples/recall-001/README.md)
 - 샘플 검증: `python3 scripts/validate_sample.py`
@@ -81,7 +82,7 @@ npm ci
 npm run dev
 ```
 
-`http://127.0.0.1:5173/`에서 기존 계정으로 로그인합니다. 사건 검색·등록, CSV 업로드, 조건 작성·승인, 영향 조회, 대응 작업과 종료 점검을 사용할 수 있습니다. 입고 증거·AI 검토·계정 생성의 전용 화면은 아직 없습니다.
+`http://127.0.0.1:5173/`에서 기존 계정으로 로그인합니다. 사건 검색·등록, CSV 업로드, 조건 작성·승인, 영향 조회, 대응 작업과 종료 점검을 사용할 수 있습니다. 입고 증거 등록·비교·승인·재판정과 검토자용 계정 생성·목록 화면도 제공합니다. AI 검토 전용 화면은 아직 없습니다.
 
 ## 회수 흐름 시연
 

@@ -116,6 +116,75 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     path: "/tmp/wecall-impact-desktop.png",
     fullPage: true,
   });
+  const oldRun = await page.getByLabel("조회·작업 기준 판정").inputValue();
+  await page.getByRole("button", { name: "입고 증거", exact: true }).click();
+  const evidence = JSON.parse(
+    readFileSync(resolve(sample, "evidence-request.json"), "utf8"),
+  );
+  async function proposeEvidence(amount: string) {
+    await page
+      .getByRole("button", { name: "입고 증거 등록", exact: true })
+      .click();
+    await page.getByLabel("보완할 입고", { exact: true }).selectOption("R4");
+    await page.getByLabel("입고 증거 원문").fill(evidence.documentText);
+    await page.getByLabel("증거 근거 인용").fill(evidence.sourceQuote);
+    await page.getByLabel("문서의 상품 ID").fill("P1");
+    await page.getByLabel("문서의 전체 입고 수량").fill(amount);
+    await page.getByLabel("문서의 입고일").fill("2026-09-04");
+    await page.getByLabel("보완 제조번호").fill("A02");
+    await page.getByLabel("보완 소비기한").fill("2026-10-31");
+    await page.getByRole("button", { name: "증거 제안 저장" }).click();
+    await expect(
+      page.getByRole("heading", { name: "R4 증거 검토" }),
+    ).toBeVisible();
+  }
+  await proposeEvidence("39");
+  await expect(
+    page.getByRole("button", { name: "증거 승인 및 재판정" }),
+  ).toBeDisabled();
+  await page.getByLabel("입고 증거 검토 사유").fill("입고 수량 불일치 확인");
+  await page.getByRole("button", { name: "증거 반려", exact: true }).click();
+  await expect(
+    page.getByText("증거를 반려했습니다.", { exact: true }),
+  ).toBeVisible();
+  await proposeEvidence("40");
+  await page
+    .getByLabel(
+      "입고 건·상품·전체 수량·입고일이 일치하고 단일 제조분임을 증거로 확인했습니다.",
+    )
+    .check();
+  await page
+    .getByLabel("입고 증거 검토 사유")
+    .fill("합성 문서의 전체 40 EA 단일 제조분 확인");
+  await page.getByRole("button", { name: "증거 승인 및 재판정" }).click();
+  await page.getByRole("button", { name: "보완 후 판정 보기" }).click();
+  await expect(page.locator(".metric strong")).toHaveText([
+    "140",
+    "110",
+    "0",
+    "70",
+    "10",
+    "10",
+  ]);
+  const newRun = await page.getByLabel("조회·작업 기준 판정").inputValue();
+  await page.getByLabel("조회·작업 기준 판정").selectOption(oldRun);
+  await expect(page.locator(".metric strong")).toHaveText([
+    "110",
+    "110",
+    "30",
+    "60",
+    "10",
+    "20",
+  ]);
+  await page.getByLabel("조회·작업 기준 판정").selectOption(newRun);
+  await expect(page.locator(".metric strong")).toHaveText([
+    "140",
+    "110",
+    "0",
+    "70",
+    "10",
+    "10",
+  ]);
   await page.getByRole("button", { name: "대응 작업", exact: true }).click();
   await page.getByRole("button", { name: "작업 만들기" }).click();
   await page.getByLabel("작업 제목").fill("합성 재고 격리 확인");
@@ -200,4 +269,35 @@ test("invalid login and session expiry return to login", async ({
   await expect(
     page.getByRole("heading", { name: "WeCall에 로그인" }),
   ).toBeVisible();
+});
+
+test("reviewer creates account; operator cannot open account controls", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await signIn(page);
+  await page.getByRole("link", { name: "계정 관리", exact: true }).click();
+  const username = "e2e-" + Date.now();
+  await page.getByLabel("새 계정명").fill(username);
+  await page.getByLabel("표시 이름").fill("합성 테스트 담당자");
+  await page
+    .getByLabel("초기 비밀번호")
+    .fill("Temporary-" + crypto.randomUUID());
+  await page.getByRole("button", { name: "계정 생성", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("계정을 생성했습니다.");
+  await expect(page.getByLabel("초기 비밀번호")).toHaveValue("");
+  await expect(
+    page.getByRole("cell", { name: username, exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "로그아웃", exact: true }).click();
+  await signIn(page, true);
+  await expect(
+    page.getByRole("link", { name: "계정 관리", exact: true }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByText("계정 관리는 검토자만 사용할 수 있습니다."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "계정 생성", exact: true }),
+  ).not.toBeVisible();
 });

@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { ClipboardList, Database, LogOut, ShieldCheck } from "@lucide/vue";
+import {
+  ClipboardList,
+  Database,
+  LogOut,
+  ShieldCheck,
+  Users,
+} from "@lucide/vue";
 import { user, restoreSession, login, logout, errorText } from "./api";
 const ready = ref(false),
   busy = ref(false),
@@ -95,6 +101,9 @@ async function signOut() {
         <RouterLink to="/"><ClipboardList :size="20" />회수 사건</RouterLink
         ><RouterLink to="/datasets"
           ><Database :size="20" />데이터 관리</RouterLink
+        >
+        <RouterLink v-if="user.roles.includes('REVIEWER')" to="/users"
+          ><Users :size="20" />계정 관리</RouterLink
         >
       </nav>
       <div class="sidebar-bottom">

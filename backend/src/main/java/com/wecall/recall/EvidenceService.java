@@ -82,6 +82,16 @@ public class EvidenceService {
             id,caseId,p.baseAssessmentId(),base.datasetId(),p.receiptId(),p.documentText(),hash(p.documentText()),encode(p));
         return get(caseId,id);
     }
+    @Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public Map<String,Object> list(UUID caseId,String status,int page,int size) {
+        require(page>=0 && size>=1 && size<=100,HttpStatus.BAD_REQUEST,"page는 0 이상, size는 1~100이어야 합니다");
+        require(status.isEmpty() || Set.of("PENDING","APPROVED","REJECTED").contains(status),HttpStatus.BAD_REQUEST,"증거 상태 형식을 확인하세요");
+        recalls.getCase(caseId);
+        String where=" WHERE case_id=? AND (?='' OR status=?)";
+        long total=jdbc.queryForObject("SELECT count(*) FROM receipt_evidence"+where,Long.class,caseId,status,status);
+        var rows=jdbc.queryForList("SELECT id,receipt_id AS \"receiptId\",status,created_at AS \"createdAt\",reviewed_by AS \"reviewedBy\",result_assessment_id AS \"resultAssessmentId\" FROM receipt_evidence"+where+" ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",caseId,status,status,size,(long)page*size);
+        return Map.of("items",rows,"page",page,"size",size,"totalElements",total,"totalPages",(total+size-1)/size);
+    }
     public Map<String,Object> get(UUID caseId,UUID id) {
         var row=evidence(caseId,id,false);
         var p=proposal(row);
