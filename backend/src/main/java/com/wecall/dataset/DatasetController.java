@@ -15,7 +15,14 @@ import java.util.Map;
 @RequestMapping("/api/v1/datasets")
 public class DatasetController {
     private final DatasetService service;
-    public DatasetController(DatasetService service) { this.service = service; }
+    private final ReadinessService readiness;
+    public DatasetController(DatasetService service,ReadinessService readiness) { this.service = service; this.readiness=readiness; }
+
+    @GetMapping("/{id}/readiness")
+    public Map<String,Object> readiness(@PathVariable java.util.UUID id) {return readiness.summary(id);}
+    @GetMapping("/{id}/readiness/issues")
+    public Map<String,Object> issues(@PathVariable java.util.UUID id,@RequestParam(defaultValue="receipts") String type,
+        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {return readiness.issues(id,type,page,size);}
 
     @GetMapping
     public Map<String,Object> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {return service.list(page,size);}

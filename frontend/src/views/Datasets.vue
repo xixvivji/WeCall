@@ -108,6 +108,7 @@ onMounted(load);
             <th>데이터 버전</th>
             <th>기준 시각</th>
             <th>등록 시각</th>
+            <th>점검</th>
           </tr>
         </thead>
         <tbody>
@@ -115,6 +116,11 @@ onMounted(load);
             <td>{{ item.id.slice(0, 8) }}</td>
             <td>{{ dateText(item.asOf) }}</td>
             <td>{{ dateText(item.createdAt) }}</td>
+            <td>
+              <RouterLink :to="`/datasets/${item.id}/readiness`"
+                >준비 상태 점검</RouterLink
+              >
+            </td>
           </tr>
         </tbody>
       </table>

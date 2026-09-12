@@ -52,6 +52,29 @@ test("real backend workflow and role boundaries", async ({ page }) => {
       .setInputFiles(resolve(sample, file + ".csv"));
   await page.getByRole("button", { name: "데이터 검증 후 등록" }).click();
   await expect(page.getByRole("status")).toContainText("등록 완료");
+  await page.getByRole("link", { name: "준비 상태 점검" }).first().click();
+  await expect(
+    page.getByRole("heading", { name: "데이터 준비 상태" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "R4", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("점검 항목", { exact: true }).selectOption("shipments");
+  await expect(
+    page.getByRole("cell", { name: "S2", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "/tmp/wecall-readiness-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole("link", { name: "회수 사건", exact: true }).click();
   const title = "브라우저 검증 " + Date.now();
   await page.getByRole("button", { name: "새 사건 등록" }).click();
