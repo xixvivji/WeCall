@@ -64,7 +64,9 @@ test("real backend workflow and role boundaries", async ({ page }) => {
       .getByLabel(label!, { exact: true })
       .setInputFiles(resolve(sample, file + ".csv"));
   await page.getByRole("button", { name: "데이터 검증 후 등록" }).click();
-  await expect(page.getByRole("status")).toContainText("등록 완료");
+  await expect(
+    page.getByRole("status").filter({ hasText: "등록 완료" }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "준비 상태 점검" }).first().click();
   await expect(
     page.getByRole("heading", { name: "데이터 준비 상태" }),
@@ -468,7 +470,9 @@ test("reviewer creates account; operator cannot open account controls", async ({
     .getByLabel("초기 비밀번호")
     .fill("Temporary-" + crypto.randomUUID());
   await page.getByRole("button", { name: "계정 생성", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("계정을 생성했습니다.");
+  await expect(
+    page.getByRole("status").filter({ hasText: "계정을 생성했습니다." }),
+  ).toBeVisible();
   await expect(page.getByLabel("초기 비밀번호")).toHaveValue("");
   await expect(
     page.getByRole("cell", { name: username, exact: true }),
@@ -528,7 +532,9 @@ test("password change and account status revoke other sessions", async ({
     await expect(
       a.getByRole("heading", { name: "WeCall에 로그인" }),
     ).toBeVisible();
-    await expect(a.getByRole("status")).toContainText("새 비밀번호로 로그인");
+    await expect(
+      a.getByRole("status").filter({ hasText: "새 비밀번호로 로그인" }),
+    ).toBeVisible();
     await b.getByRole("button", { name: "검색", exact: true }).click();
     await expect(
       b.getByRole("heading", { name: "WeCall에 로그인" }),
@@ -550,9 +556,9 @@ test("password change and account status revoke other sessions", async ({
     }
     await page.reload();
     await status("합성 계정 접근 중지 검증", "계정 비활성화");
-    await expect(page.getByRole("status")).toContainText(
-      "계정을 비활성화했습니다.",
-    );
+    await expect(
+      page.getByRole("status").filter({ hasText: "계정을 비활성화했습니다." }),
+    ).toBeVisible();
     await b.getByRole("button", { name: "검색", exact: true }).click();
     await expect(
       b.getByRole("heading", { name: "WeCall에 로그인" }),
