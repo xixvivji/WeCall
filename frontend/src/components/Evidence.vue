@@ -11,6 +11,7 @@ import {
 } from "../api";
 const props = defineProps<{
     caseId: string;
+    initialEvidence?: string;
     closed: boolean;
     assessment?: Assessment;
   }>(),
@@ -180,7 +181,10 @@ watch(
     expiry.value = "";
   },
 );
-onMounted(() => load());
+onMounted(async () => {
+  await load();
+  if (props.initialEvidence) await select(props.initialEvidence);
+});
 onUnmounted(() => {
   generation++;
   detailGeneration++;

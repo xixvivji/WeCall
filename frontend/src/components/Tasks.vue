@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, nextTick } from "vue";
+import { useRoute } from "vue-router";
 import { api, user, label, errorText, dateText, type Assessment } from "../api";
+const route = useRoute();
 const props = defineProps<{
   caseId: string;
   initialTask?: string;
@@ -113,7 +115,14 @@ async function act(path: string, body: Record<string, unknown>) {
 }
 onMounted(async () => {
   await load();
-  if (props.initialTask) await select(props.initialTask);
+  if (props.initialTask) {
+    await select(props.initialTask);
+    await nextTick();
+    if (typeof route.query.proof === "string")
+      document
+        .getElementById("proof-" + route.query.proof)
+        ?.scrollIntoView({ block: "center" });
+  }
   if (reviewer.value)
     try {
       users.value = await api("/api/users");
@@ -317,7 +326,13 @@ onMounted(async () => {
         </form></template
       >
       <h3 class="spaced">처리 증빙 이력</h3>
-      <div v-for="item in selected.proofs" :key="item.id" class="proof">
+      <div
+        v-for="item in selected.proofs"
+        :key="item.id"
+        :id="'proof-' + item.id"
+        :class="{ 'review-highlight': route.query.proof === item.id }"
+        class="proof"
+      >
         <span class="badge" :class="item.status">{{ label(item.status) }}</span
         ><span class="small muted">
           · {{ item.reviewRound }}회차 · {{ item.submittedBy }}</span
@@ -375,6 +390,10 @@ onMounted(async () => {
   </fieldset>
 </template>
 <style scoped>
+.review-highlight {
+  outline: 2px solid #126f58;
+  outline-offset: 4px;
+}
 .task-surface {
   border: 0;
   padding: 0;

@@ -3,6 +3,7 @@ import { createRouter, createWebHashHistory } from "vue-router";
 import App from "./App.vue";
 import Cases from "./views/Cases.vue";
 import CaseDetail from "./views/CaseDetail.vue";
+import ReviewInbox from "./views/ReviewInbox.vue";
 import Readiness from "./views/Readiness.vue";
 import Datasets from "./views/Datasets.vue";
 import Users from "./views/Users.vue";
@@ -14,6 +15,7 @@ const router = createRouter({
   routes: [
     { path: "/", component: Cases },
     { path: "/workspace", component: Workspace },
+    { path: "/reviews", component: ReviewInbox },
     { path: "/recalls/:id", component: CaseDetail },
     { path: "/datasets", component: Datasets },
     { path: "/datasets/:id/readiness", component: Readiness },

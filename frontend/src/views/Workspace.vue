@@ -78,6 +78,7 @@ onMounted(() => load());
     </p>
   </section>
   <section class="panel">
+    <RouterLink v-if="reviewer" to="/reviews">검토 대기함 열기</RouterLink>
     <h2>내 할 일 · 작업 찾기</h2>
     <form @submit.prevent="load(true)">
       <fieldset :disabled="busy" class="filters">
