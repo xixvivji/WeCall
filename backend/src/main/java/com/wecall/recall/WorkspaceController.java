@@ -13,6 +13,35 @@ import java.util.*;
 public class WorkspaceController {
     private final JdbcTemplate jdbc;
     public WorkspaceController(JdbcTemplate jdbc) {this.jdbc=jdbc;}
+    private static final String REVIEWS="""
+        SELECT 'CONDITION' AS kind,r.id,r.case_id,c.title AS case_title,
+            '조건 v' || r.version AS title,r.created_at,NULL::uuid AS task_id
+        FROM recall_condition r JOIN recall_case c ON c.id=r.case_id WHERE r.status='DRAFT' AND c.status='OPEN'
+        UNION ALL
+        SELECT 'EVIDENCE',e.id,e.case_id,c.title,'입고 ' || e.receipt_id || ' 증거',e.created_at,NULL::uuid
+        FROM receipt_evidence e JOIN recall_case c ON c.id=e.case_id WHERE e.status='PENDING' AND c.status='OPEN'
+        UNION ALL
+        SELECT 'PROOF',p.id,t.case_id,c.title,t.title || ' · 증빙',p.submitted_at,t.id
+        FROM response_task_proof p JOIN response_task t ON t.id=p.task_id JOIN recall_case c ON c.id=t.case_id
+        WHERE p.status='PENDING' AND p.review_round=t.review_round AND t.status IN ('IN_PROGRESS','CANCELLED') AND c.status='OPEN'
+        """;
+    @GetMapping("/reviews")
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public Map<String,Object> reviews(@RequestParam(defaultValue="ALL") String kind,@RequestParam(defaultValue="") String q,
+        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
+        if(!CurrentActor.reviewer())throw new RecallService.Failure(HttpStatus.FORBIDDEN,"검토 대기함은 검토자만 사용할 수 있습니다");
+        if(!Set.of("ALL","CONDITION","EVIDENCE","PROOF").contains(kind)||q.length()>200||page<0||size<1||size>100)
+            throw new RecallService.Failure(HttpStatus.BAD_REQUEST,"검토 대기함 조회 조건을 확인하세요");
+        String from=" FROM ("+REVIEWS+") r WHERE (strpos(lower(case_title),lower(?))>0 OR strpos(lower(title),lower(?))>0)";
+        List<Object> args=new ArrayList<>(List.of(q.strip(),q.strip()));
+        Map<String,Long> counts=new LinkedHashMap<>();for(String k:List.of("CONDITION","EVIDENCE","PROOF"))counts.put(k,0L);
+        jdbc.query("SELECT kind,count(*) AS n"+from+" GROUP BY kind",rs->{counts.put(rs.getString("kind"),rs.getLong("n"));},args.toArray());
+        if(!kind.equals("ALL")){from+=" AND kind=?";args.add(kind);}
+        long total=kind.equals("ALL")?counts.values().stream().mapToLong(Long::longValue).sum():counts.get(kind);
+        args.add(size);args.add((long)page*size);
+        var rows=jdbc.queryForList("SELECT kind,id,case_id AS \"caseId\",case_title AS \"caseTitle\",title,created_at AS \"createdAt\",task_id AS \"taskId\""+from+" ORDER BY created_at,id,kind LIMIT ? OFFSET ?",args.toArray());
+        return Map.of("items",rows,"counts",counts,"totalElements",total,"page",page,"size",size,"totalPages",(total+size-1)/size);
+    }
     @GetMapping("/summary")
     public Map<String,Object> summary() {
         return jdbc.queryForMap("""

@@ -117,6 +117,9 @@ async function signOut() {
         <RouterLink to="/workspace"
           ><ClipboardList :size="20" />업무 대시보드</RouterLink
         >
+        <RouterLink v-if="user.roles.includes('REVIEWER')" to="/reviews"
+          ><ShieldCheck :size="20" />검토 대기함</RouterLink
+        >
         <RouterLink to="/account"><KeyRound :size="20" />내 계정</RouterLink>
       </nav>
       <div class="sidebar-bottom">
@@ -150,7 +153,7 @@ async function signOut() {
       </header>
       <main class="content">
         <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <RouterView :key="$route.path" />
+        <RouterView :key="$route.fullPath" />
       </main>
     </div>
   </div>

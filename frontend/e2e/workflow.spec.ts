@@ -77,6 +77,30 @@ test("real backend workflow and role boundaries", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole("link", { name: "회수 사건", exact: true }).click();
   const title = "브라우저 검증 " + Date.now();
+  async function openFromInbox(kind: string) {
+    await page.getByRole("link", { name: "검토 대기함", exact: true }).click();
+    await page.getByLabel("검토 유형", { exact: true }).selectOption(kind);
+    await page.getByLabel("사건·검토 항목 검색").fill(title);
+    await page.getByRole("button", { name: "대기 항목 조회" }).click();
+    await expect(
+      page.getByRole("link", { name: "검토 열기", exact: true }),
+    ).toHaveCount(1);
+    if (kind === "CONDITION") {
+      await page.setViewportSize({ width: 390, height: 844 });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: "/tmp/wecall-inbox-mobile.png",
+        fullPage: true,
+      });
+      await page.setViewportSize({ width: 1280, height: 720 });
+    }
+    await page.getByRole("link", { name: "검토 열기", exact: true }).click();
+  }
+
   await page.getByRole("button", { name: "새 사건 등록" }).click();
   await page.getByLabel("사건명", { exact: true }).fill(title);
   await page
@@ -110,6 +134,7 @@ test("real backend workflow and role boundaries", async ({ page }) => {
       .fill(id === "P1" ? "제조사·규격 확인" : "별도 규격·제조사 확인");
   }
   await page.getByRole("button", { name: "조건 초안 저장" }).click();
+  await openFromInbox("CONDITION");
   await expect(
     page.getByText("조건을 승인했습니다.", { exact: false }),
   ).not.toBeVisible();
@@ -174,6 +199,10 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     ).toBeVisible();
   }
   await proposeEvidence("39");
+  await openFromInbox("EVIDENCE");
+  await expect(
+    page.getByRole("heading", { name: "R4 증거 검토" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "증거 승인 및 재판정" }),
   ).toBeDisabled();
@@ -291,6 +320,8 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     .getByLabel("처리 증빙", { exact: true })
     .fill("합성 데이터 시연: 재고 격리 확인. 실제 작업 아님.");
   await page.getByRole("button", { name: "증빙 제출" }).click();
+  await openFromInbox("PROOF");
+  await expect(page.locator(".proof.review-highlight")).toBeVisible();
   await page.getByLabel("증빙 검토 사유").fill("합성 근거 검토");
   await page.getByRole("button", { name: "증빙 승인", exact: true }).click();
   await page.getByLabel("상태 변경 사유").fill("시연 완료");
@@ -512,4 +543,21 @@ test("workspace filters tasks and opens their existing detail", async ({
     path: "/tmp/wecall-workspace-mobile.png",
     fullPage: true,
   });
+});
+
+test("operator cannot open review inbox controls", async ({ page }) => {
+  await page.goto("/");
+  await signIn(page, true);
+  await expect(
+    page.getByRole("link", { name: "검토 대기함", exact: true }),
+  ).not.toBeVisible();
+  await page.goto("/#/reviews");
+  await expect(
+    page.getByText("검토 대기함은 검토자만 사용할 수 있습니다.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "대기 항목 조회" }),
+  ).not.toBeVisible();
 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import {
   api,
@@ -19,13 +19,20 @@ import Tasks from "../components/Tasks.vue";
 import Closure from "../components/Closure.vue";
 import Comparison from "../components/Comparison.vue";
 import Evidence from "../components/Evidence.vue";
-const id = String(useRoute().params.id),
+const route = useRoute();
+const id = String(route.params.id),
   recall = ref<CaseDetail>(),
   conditions = ref<Condition[]>([]),
   runs = ref<RunRow[]>([]),
   assessment = ref<Assessment>(),
   runId = ref(""),
-  tab = ref(useRoute().query.task ? "tasks" : "overview"),
+  tab = ref(
+    useRoute().query.task
+      ? "tasks"
+      : useRoute().query.evidence
+        ? "evidence"
+        : "overview",
+  ),
   error = ref(""),
   success = ref(""),
   busy = ref(false),
@@ -132,7 +139,14 @@ async function saved() {
   success.value = "조건 초안을 저장했습니다. 내용을 검토한 후 승인하세요.";
   await load();
 }
-onMounted(load);
+onMounted(async () => {
+  await load();
+  await nextTick();
+  if (typeof route.query.condition === "string")
+    document
+      .getElementById("condition-" + route.query.condition)
+      ?.scrollIntoView({ block: "center" });
+});
 </script>
 <template>
   <RouterLink to="/" class="back-link">← 사건 목록</RouterLink>
@@ -194,6 +208,10 @@ onMounted(load);
           <div
             v-for="condition in conditions.slice().reverse()"
             :key="condition.id"
+            :id="'condition-' + condition.id"
+            :class="{
+              'review-highlight': $route.query.condition === condition.id,
+            }"
             class="task-card"
           >
             <div class="section-heading">
@@ -389,6 +407,7 @@ onMounted(load);
       <Comparison v-if="tab === 'comparison'" :case-id="id" :runs="runs" />
       <Evidence
         v-if="tab === 'evidence'"
+        :initial-evidence="String($route.query.evidence || '')"
         :case-id="id"
         :closed="closed"
         :assessment="assessment"
@@ -410,3 +429,10 @@ onMounted(load);
       /> </template
   ></template>
 </template>
+
+<style scoped>
+.review-highlight {
+  outline: 2px solid #126f58;
+  outline-offset: 4px;
+}
+</style>

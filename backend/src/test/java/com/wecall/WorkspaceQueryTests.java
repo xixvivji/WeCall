@@ -24,6 +24,34 @@ class WorkspaceQueryTests {
         jdbc.update("INSERT INTO recall_case(id,title,source_type,source_text,created_at) VALUES (?,?,'SUPPLIER','원문','2026-09-10T00:00:00Z')",first,"크래커 100% 회수");
         jdbc.update("INSERT INTO recall_case(id,title,source_type,source_text,created_at) VALUES (?,?,'OFFICIAL','원문','2026-09-10T00:00:00Z')",second,"크래커 회수");
     }
+    @Test @WithMockUser(roles="REVIEWER")
+    void reviewInboxCountsOnlyActionableItemsAndRemovesReviewedOnRefresh() throws Exception {
+        UUID condition=UUID.randomUUID(),run=UUID.randomUUID(),evidence=UUID.randomUUID(),task=UUID.randomUUID(),proof=UUID.randomUUID();
+        jdbc.update("INSERT INTO dataset(id,as_of) VALUES (?,now())",first);
+        jdbc.update("INSERT INTO product VALUES (?,'P1','상품','제조사','100g','EA')",first);
+        jdbc.update("INSERT INTO receipt VALUES (?,'R1','P1',NULL,NULL,10,current_date)",first);
+        jdbc.update("INSERT INTO recall_condition(id,case_id,dataset_id,version,definition) VALUES (?,?,?,1,'{}')",condition,first,first);
+        jdbc.update("INSERT INTO assessment_run(id,case_id,condition_id,dataset_id,result) VALUES (?,?,?,?,'{}')",run,first,condition,first);
+        jdbc.update("INSERT INTO receipt_evidence(id,case_id,base_assessment_id,base_dataset_id,receipt_id,document_text,document_sha256,proposal) VALUES (?,?,?,?,'R1','근거',?,'{}')",evidence,first,run,first,"a".repeat(64));
+        jdbc.update("INSERT INTO response_task(id,case_id,task_type,target_type,title,instructions,status) VALUES (?,?,'QUARANTINE','CASE','작업','지시','CANCELLED')",task,first);
+        jdbc.update("INSERT INTO response_task_proof(id,task_id,review_round,evidence_text,sha256,submitted_by) VALUES (?,?,1,'증빙',?,'담당자')",proof,task,"b".repeat(64));
+        mvc.perform(get("/api/v1/workspace/reviews")).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(3))
+            .andExpect(jsonPath("$.counts.CONDITION").value(1)).andExpect(jsonPath("$.counts.EVIDENCE").value(1)).andExpect(jsonPath("$.counts.PROOF").value(1));
+        mvc.perform(get("/api/v1/workspace/reviews?kind=PROOF&size=1")).andExpect(jsonPath("$.items[0].taskId").value(task.toString())).andExpect(jsonPath("$.totalPages").value(1));
+        mvc.perform(get("/api/v1/workspace/reviews?q=없는사건")).andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/api/v1/workspace/reviews?page=1&size=2")).andExpect(jsonPath("$.items.length()").value(1));
+        mvc.perform(get("/api/v1/workspace/reviews?kind=INVALID")).andExpect(status().isBadRequest());
+        jdbc.update("UPDATE response_task SET review_round=2 WHERE id=?",task);
+        mvc.perform(get("/api/v1/workspace/reviews?kind=PROOF")).andExpect(jsonPath("$.totalElements").value(0));
+        jdbc.update("UPDATE recall_condition SET status='APPROVED',approved_by='검토자',approved_at=now() WHERE id=?",condition);
+        mvc.perform(get("/api/v1/workspace/reviews")).andExpect(jsonPath("$.totalElements").value(1));
+        jdbc.update("UPDATE recall_case SET status='CLOSED',closed_at=now() WHERE id=?",first);
+        mvc.perform(get("/api/v1/workspace/reviews")).andExpect(jsonPath("$.totalElements").value(0));
+    }
+    @Test void operatorCannotReadReviewInbox() throws Exception {
+        mvc.perform(get("/api/v1/workspace/reviews")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/workspace/reviews").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())).andExpect(status().isUnauthorized());
+    }
     @Test void stablePaginationAndLiteralSearch() throws Exception {
         mvc.perform(get("/api/v1/recalls").param("size","1")).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2)).andExpect(jsonPath("$.items[0].id").value(second.toString()));
         mvc.perform(get("/api/v1/recalls").param("page","1").param("size","1")).andExpect(jsonPath("$.items[0].id").value(first.toString()));
