@@ -124,3 +124,7 @@ API 키와 비밀번호는 Git에 올리지 않습니다. `.env` 파일은 Git�
 
 
 새 입고 증거·작업 증빙에 PDF/PNG/JPEG 파일을 최대 5개(파일당 10 MiB) 첨부할 수 있습니다. 기본 저장 위치는 `~/.wecall/attachments`이며 `WECALL_ATTACHMENT_DIR`로 변경합니다. 인증 후 다운로드하며 원본 크기·해시를 확인합니다. OCR·미리보기·악성 파일 검사는 제공하지 않습니다. [첨부 API와 로컬 복구 절차](docs/design/attachments-api.md)
+
+## 자동 검증과 업무 검증 기록
+
+[CI 실행 범위·확인 방법](docs/validation/ci.md) · [합성 업무 검증 결과](docs/validation/report-2026-09-13.md). 푸시·PR마다 백엔드 테스트, 프론트 빌드, 브라우저 및 HTTP 업무 흐름을 검사합니다. 배포는 수행하지 않습니다.
