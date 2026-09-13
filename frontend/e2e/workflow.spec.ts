@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 const sample = resolve("../samples/recall-001");
 // No credentials, traces, or login screenshots are persisted in test artifacts.
@@ -7,12 +7,25 @@ const credentials: Record<string, string> = { ...process.env } as Record<
   string,
   string
 >;
-for (const line of readFileSync(resolve("../.env"), "utf8").split("\n")) {
+const envFile = resolve("../.env");
+for (const line of (existsSync(envFile)
+  ? readFileSync(envFile, "utf8")
+  : ""
+).split("\n")) {
   if (line && !line.startsWith("#") && line.includes("=")) {
     const split = line.indexOf("=");
     const key = line.slice(0, split);
     if (!credentials[key]) credentials[key] = line.slice(split + 1);
   }
+}
+for (const key of [
+  "WECALL_USERNAME",
+  "WECALL_PASSWORD",
+  "WECALL_BOOTSTRAP_OPERATOR_USERNAME",
+  "WECALL_BOOTSTRAP_OPERATOR_PASSWORD",
+]) {
+  if (!credentials[key])
+    throw new Error(`브라우저 검증 환경 변수 누락: ${key}`);
 }
 async function signIn(page: Page, operator = false) {
   await page
@@ -51,7 +64,9 @@ test("real backend workflow and role boundaries", async ({ page }) => {
       .getByLabel(label!, { exact: true })
       .setInputFiles(resolve(sample, file + ".csv"));
   await page.getByRole("button", { name: "데이터 검증 후 등록" }).click();
-  await expect(page.getByRole("status")).toContainText("등록 완료");
+  await expect(
+    page.getByRole("status").filter({ hasText: "등록 완료" }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "준비 상태 점검" }).first().click();
   await expect(
     page.getByRole("heading", { name: "데이터 준비 상태" }),
@@ -350,6 +365,10 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     .fill("합성 시연용 작업. 실제 조치 기록이 아닙니다.");
   await page.getByRole("button", { name: "작업 등록", exact: true }).click();
   await page.getByRole("button", { name: "작업 상세" }).click();
+  await page.getByRole("button", { name: "로그아웃", exact: true }).click();
+  await signIn(page, true);
+  await page.getByRole("button", { name: "대응 작업", exact: true }).click();
+  await page.getByRole("button", { name: "작업 상세" }).click();
   await page.getByLabel("상태 변경 사유").fill("가상 작업 시작");
   await page.getByRole("button", { name: "작업 시작", exact: true }).click();
   await page
@@ -359,6 +378,8 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     .getByLabel("작업 증빙 파일", { exact: true })
     .setInputFiles(resolve("../samples/attachments/synthetic-checker.png"));
   await page.getByRole("button", { name: "증빙 제출" }).click();
+  await page.getByRole("button", { name: "로그아웃", exact: true }).click();
+  await signIn(page);
   await openFromInbox("PROOF");
   await expect(
     page.getByRole("button", {
@@ -449,7 +470,9 @@ test("reviewer creates account; operator cannot open account controls", async ({
     .getByLabel("초기 비밀번호")
     .fill("Temporary-" + crypto.randomUUID());
   await page.getByRole("button", { name: "계정 생성", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("계정을 생성했습니다.");
+  await expect(
+    page.getByRole("status").filter({ hasText: "계정을 생성했습니다." }),
+  ).toBeVisible();
   await expect(page.getByLabel("초기 비밀번호")).toHaveValue("");
   await expect(
     page.getByRole("cell", { name: username, exact: true }),
@@ -509,7 +532,9 @@ test("password change and account status revoke other sessions", async ({
     await expect(
       a.getByRole("heading", { name: "WeCall에 로그인" }),
     ).toBeVisible();
-    await expect(a.getByRole("status")).toContainText("새 비밀번호로 로그인");
+    await expect(
+      a.getByRole("status").filter({ hasText: "새 비밀번호로 로그인" }),
+    ).toBeVisible();
     await b.getByRole("button", { name: "검색", exact: true }).click();
     await expect(
       b.getByRole("heading", { name: "WeCall에 로그인" }),
@@ -531,9 +556,9 @@ test("password change and account status revoke other sessions", async ({
     }
     await page.reload();
     await status("합성 계정 접근 중지 검증", "계정 비활성화");
-    await expect(page.getByRole("status")).toContainText(
-      "계정을 비활성화했습니다.",
-    );
+    await expect(
+      page.getByRole("status").filter({ hasText: "계정을 비활성화했습니다." }),
+    ).toBeVisible();
     await b.getByRole("button", { name: "검색", exact: true }).click();
     await expect(
       b.getByRole("heading", { name: "WeCall에 로그인" }),

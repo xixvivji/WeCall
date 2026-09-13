@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, 'feature/**', 'chore/**', 'release/**', 'hotfix/**']
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verification:
+    name: Backend and business workflow
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: wecall_ci
+          POSTGRES_USER: wecall_ci
+          POSTGRES_PASSWORD: ci-disposable-database-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wecall_ci -d wecall_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+    env:
+      DB_URL: jdbc:postgresql://127.0.0.1:5432/wecall_ci
+      DB_USERNAME: wecall_ci
+      DB_PASSWORD: ci-disposable-database-only
+      WECALL_BOOTSTRAP_USERNAME: demo-reviewer
+      WECALL_BOOTSTRAP_PASSWORD: ci-disposable-reviewer-only
+      WECALL_BOOTSTRAP_OPERATOR_USERNAME: demo-operator
+      WECALL_BOOTSTRAP_OPERATOR_PASSWORD: ci-disposable-operator-only
+      WECALL_USERNAME: demo-reviewer
+      WECALL_PASSWORD: ci-disposable-reviewer-only
+      WECALL_ATTACHMENT_DIR: /tmp/wecall-ci-attachments
+      WECALL_AI_ALLOW_MOCK: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            backend/*.gradle
+            backend/gradle/wrapper/gradle-wrapper.properties
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Validate synthetic golden data and cleanup utility
+        run: |
+          python3 scripts/validate_sample.py
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Backend tests and build
+        run: ./backend/gradlew -p backend --no-daemon test bootJar
+      - name: Frontend install and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          npx playwright install --with-deps chromium
+      - name: Browser and HTTP business acceptance
+        run: bash scripts/ci/business-workflow.sh
+      - name: Save verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-reports
+          retention-days: 7
+          path: |
+            backend/build/test-results/test/*.xml
+            frontend/test-results/results.xml
+            validation-results/*.json
+          if-no-files-found: warn
