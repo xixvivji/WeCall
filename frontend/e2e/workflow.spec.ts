@@ -59,6 +59,13 @@ test("real backend workflow and role boundaries", async ({ page }) => {
   await expect(
     page.getByRole("cell", { name: "R4", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "데이터 출처·원본 추적", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "상품 · products.csv", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".source-file")).toHaveCount(5);
   await page.getByLabel("점검 항목", { exact: true }).selectOption("shipments");
   await expect(
     page.getByRole("cell", { name: "S2", exact: true }),

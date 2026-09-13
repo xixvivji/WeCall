@@ -95,6 +95,11 @@ class ReceiptEvidenceTests {
         originalUnchanged(); singleDataset();
         JsonNode approved=approve(created.get("id").asText(),200);
         UUID newDataset=UUID.fromString(approved.get("resultDatasetId").asText());
+        mvc.perform(get("/api/v1/datasets/"+newDataset+"/provenance")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.source").value("EVIDENCE")).andExpect(jsonPath("$.files").isEmpty())
+            .andExpect(jsonPath("$.derivation.parentDatasetId").value(datasetId.toString()))
+            .andExpect(jsonPath("$.derivation.evidenceId").value(created.get("id").asText()))
+            .andExpect(jsonPath("$.derivation.reviewedBy").value("test-reviewer"));
         Assessment after=recalls.getAssessment(caseId,UUID.fromString(approved.get("resultAssessmentId").asText()));
         assertThat(approved.get("status").asText()).isEqualTo("APPROVED");
         assertThat(approved.get("after").get("lotNumber").asText()).isEqualTo("A02");

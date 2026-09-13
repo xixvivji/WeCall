@@ -35,6 +35,27 @@ class DatasetImportTests {
         return req;
     }
     void empty() { assertThat(jdbc.queryForObject("SELECT count(*) FROM dataset",Long.class)).isZero(); }
+    @Test void provenanceHashesOriginalBytesAndUsesAuthenticatedActor() throws Exception {
+        mvc.perform(request("","","")).andExpect(status().isCreated());
+        UUID id=jdbc.queryForObject("SELECT id FROM dataset",UUID.class);
+        String hash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(Path.of("../samples/recall-001/products.csv"))));
+        assertThat(jdbc.queryForObject("SELECT sha256 FROM dataset_source_file WHERE dataset_id=? AND file_type='products'",String.class,id)).isEqualTo(hash);
+        assertThat(jdbc.queryForObject("SELECT byte_size FROM dataset_source_file WHERE dataset_id=? AND file_type='products'",Long.class,id)).isEqualTo(Files.size(Path.of("../samples/recall-001/products.csv")));
+        mvc.perform(get("/api/v1/datasets/"+id+"/provenance")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.source").value("CSV")).andExpect(jsonPath("$.uploadedBy").value("test-reviewer"))
+            .andExpect(jsonPath("$.files.length()").value(5));
+        mvc.perform(get("/api/v1/datasets/"+id+"/provenance").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("operator").roles("OPERATOR"))).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/datasets/"+id+"/provenance").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())).andExpect(status().isUnauthorized());
+        UUID legacy=UUID.randomUUID();jdbc.update("INSERT INTO dataset(id,as_of) VALUES (?,now())",legacy);
+        mvc.perform(get("/api/v1/datasets/"+legacy+"/provenance")).andExpect(status().isOk()).andExpect(jsonPath("$.source").value("LEGACY")).andExpect(jsonPath("$.files").isEmpty());
+        mvc.perform(get("/api/v1/datasets/"+UUID.randomUUID()+"/provenance")).andExpect(status().isNotFound());
+    }
+    @Test void provenanceFailureRollsBackDatasetAndMetadataTogether() throws Exception {
+        jdbc.execute("ALTER TABLE dataset_source_file ADD CONSTRAINT reject_provenance_test CHECK (file_type <> 'receipts')");
+        try {Assertions.assertThrows(Exception.class,()->mvc.perform(request("","","")));empty();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM dataset_source_file",Long.class)).isZero();
+        } finally {jdbc.execute("ALTER TABLE dataset_source_file DROP CONSTRAINT reject_provenance_test");}
+    }
     @Test void readinessPreservesDatasetBoundaryAndPartialLinks() throws Exception {
         mvc.perform(request("","","")).andExpect(status().isCreated());
         UUID id=jdbc.queryForObject("SELECT id FROM dataset",UUID.class);

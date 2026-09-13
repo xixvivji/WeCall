@@ -18,6 +18,8 @@ public class DatasetController {
     private final ReadinessService readiness;
     public DatasetController(DatasetService service,ReadinessService readiness) { this.service = service; this.readiness=readiness; }
 
+    @GetMapping("/{id}/provenance")
+    public Map<String,Object> provenance(@PathVariable java.util.UUID id) {return service.provenance(id);}
     @GetMapping("/{id}/readiness")
     public Map<String,Object> readiness(@PathVariable java.util.UUID id) {return readiness.summary(id);}
     @GetMapping("/{id}/readiness/issues")
@@ -38,7 +40,7 @@ public class DatasetController {
         @RequestPart MultipartFile inventory, @RequestPart MultipartFile shipments,
         @RequestPart MultipartFile shipmentAllocations) {
         return service.importFiles(asOf, Map.of("products",products,"receipts",receipts,"inventory",inventory,
-            "shipments",shipments,"shipment_allocations",shipmentAllocations));
+            "shipments",shipments,"shipment_allocations",shipmentAllocations),com.wecall.auth.CurrentActor.username());
     }
 }
 

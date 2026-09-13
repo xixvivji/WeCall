@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import Provenance from "../components/Provenance.vue";
 import { useRoute } from "vue-router";
 import { api, errorText, dateText, type Page } from "../api";
 const id = String(useRoute().params.id);
@@ -74,6 +75,7 @@ onMounted(() => load());
   </div>
   <p v-if="error" class="error" role="alert">{{ error }}</p>
   <p v-if="busy" role="status">점검 결과를 불러오는 중…</p>
+  <Provenance v-if="summary" :dataset-id="id" />
   <template v-if="summary"
     ><section class="panel">
       <h2>등록 현황</h2>
