@@ -136,6 +136,8 @@ public class DatasetService {
     @Transactional
     public Map<String,Object> importFiles(OffsetDateTime asOf,Map<String,MultipartFile> uploads,String actor) {
 
+        if(uploads.values().stream().anyMatch(f->f.getSize()>5L*1024*1024)||uploads.values().stream().mapToLong(MultipartFile::getSize).sum()>26L*1024*1024)
+            throw new com.wecall.recall.RecallService.Failure(org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE,"CSV 파일당 5 MiB, 전체 26 MiB 제한입니다");
         List<ImportError> errors = new ArrayList<>();
         Map<String, Map<String, Row>> data = new LinkedHashMap<>();
         for (String file : FILES) data.put(file, parse(file, uploads.get(file), errors));

@@ -1,6 +1,6 @@
 # 구현 ERD와 데이터 사전
 
-기준: 2026-09-13, develop 20095d7. [Flyway V1~V9](../../backend/src/main/resources/db/migration/)의 실제 18개 테이블을 기준으로 한다. 단일 기업 모델이며 아래 선은 DB FK 관계다. 복합 FK의 정확한 컬럼은 데이터 사전·SQL을 따른다.
+기준: 2026-09-13, 파일 첨부 V10 반영. [Flyway V1~V10](../../backend/src/main/resources/db/migration/)의 실제 20개 테이블을 기준으로 한다. 단일 기업 모델이며 아래 선은 DB FK 관계다. 복합 FK의 정확한 컬럼은 데이터 사전·SQL을 따른다.
 
 ## 입력 데이터
 
@@ -78,6 +78,25 @@ assignee, 승인자·등록자·이력 actor 등 사용자 문자열에는 DB �
 
 ## 변경 원칙과 한계
 
-대상 판정·상품 연결·조치 상태는 독립이다. 승인 조건과 판정 결과는 애플리케이션 경로에서 덮어쓰지 않으며 증거 보완은 새 버전을 만든다. DB 관리자까지 차단하는 WORM 저장소나 전 테이블 수정 방지 트리거가 있다는 의미는 아니다. 파일 첨부·세션 테이블·범용 감사 로그 테이블·기업 tenant 테이블은 현재 없다.
+대상 판정·상품 연결·조치 상태는 독립이다. 승인 조건과 판정 결과는 애플리케이션 경로에서 덮어쓰지 않으며 증거 보완은 새 버전을 만든다. DB 관리자까지 차단하는 WORM 저장소나 전 테이블 수정 방지 트리거가 있다는 의미는 아니다. 세션 테이블·범용 감사 로그 테이블·기업 tenant 테이블은 현재 없다.
 
-새 기능에서 스키마를 바꾸면 마이그레이션과 이 문서를 같은 작업에서 갱신한다. 예정된 파일 테이블은 구현 전이므로 이 ERD에 포함하지 않는다.
+새 기능에서 스키마를 바꾸면 마이그레이션과 이 문서를 같은 작업에서 갱신한다. 파일 관련 테이블과 관계는 아래 V10 항목을 따른다.
+
+
+## V10 파일 첨부
+
+```mermaid
+erDiagram
+    recall_case ||--o{ evidence_attachment : scopes
+    receipt_evidence o|--o{ evidence_attachment : files
+    response_task o|--o{ evidence_attachment : proof_scope
+    response_task_proof o|--o{ evidence_attachment : files
+    evidence_attachment ||--o{ attachment_event : access_history
+```
+
+| 테이블 | 키와 주요 컬럼 | DB 제약·의미 |
+| --- | --- | --- |
+| evidence_attachment | id UUID PK; case_id, evidence_id/task_id/proof_id; filename, media_type, byte_size, sha256, uploaded_by, created_at | 입고 증거 또는 작업 증빙 하나에만 연결; 증거+사건·작업+사건·증빙+작업 복합 FK; 파일은 전용 디렉터리에 저장 |
+| attachment_event | id UUID PK; attachment_id FK; event_type, actor, created_at | UPLOADED/DOWNLOAD_REQUESTED; 사용자 문자열은 FK 아님 |
+
+증거에 (id,case_id), 작업 증빙에 (id,task_id) 유일키를 추가해 첨부의 사건·작업 경계를 DB에서도 검증한다. 원본 바이트는 DB 외부에 있으며 커밋 완료와 파일 무결성을 애플리케이션이 확인한다. 별도 첨부 삭제·교체 API는 없다.

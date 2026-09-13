@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import {
   api,
+  withAttachments,
   user,
   errorText,
   label,
@@ -9,6 +10,9 @@ import {
   type Page,
   type Assessment,
 } from "../api";
+import FilePicker from "./FilePicker.vue";
+import Attachments from "./Attachments.vue";
+const attachmentFiles = ref<File[]>([]);
 const props = defineProps<{
     caseId: string;
     initialEvidence?: string;
@@ -116,19 +120,23 @@ async function create() {
       throw new Error("제조번호 또는 소비기한 보완값을 입력하세요.");
     const result = await api<Detail>(
       `/api/v1/recalls/${props.caseId}/evidence`,
-      {
-        baseAssessmentId: props.assessment.id,
-        receiptId: receiptId.value,
-        documentText: documentText.value,
-        sourceQuote: sourceQuote.value,
-        observedProductId: product.value,
-        observedReceivedQuantity: quantity.value,
-        observedReceivedAt: receivedAt.value,
-        lotNumber: lot.value || null,
-        expiryDate: expiry.value || null,
-      },
+      withAttachments(
+        {
+          baseAssessmentId: props.assessment.id,
+          receiptId: receiptId.value,
+          documentText: documentText.value,
+          sourceQuote: sourceQuote.value,
+          observedProductId: product.value,
+          observedReceivedQuantity: quantity.value,
+          observedReceivedAt: receivedAt.value,
+          lotNumber: lot.value || null,
+          expiryDate: expiry.value || null,
+        },
+        attachmentFiles.value,
+      ),
     );
     selected.value = result;
+    attachmentFiles.value = [];
     creating.value = false;
     confirmed.value = false;
     note.value = "";
@@ -181,6 +189,9 @@ watch(
     expiry.value = "";
   },
 );
+watch(creating, () => {
+  attachmentFiles.value = [];
+});
 onMounted(async () => {
   await load();
   if (props.initialEvidence) await select(props.initialEvidence);
@@ -268,6 +279,7 @@ onUnmounted(() => {
           <label>보완 제조번호<input v-model="lot" maxlength="500" /></label
           ><label>보완 소비기한<input v-model="expiry" type="date" /></label>
         </div>
+        <FilePicker v-model="attachmentFiles" label="입고 증거 파일" />
         <button class="primary">증거 제안 저장</button>
       </form>
       <div class="inline">
@@ -337,6 +349,12 @@ onUnmounted(() => {
       </footer>
     </section>
     <section v-if="selected" class="panel">
+      <Attachments
+        :key="selected.id"
+        :case-id="caseId"
+        :target-id="selected.id"
+        type="evidenceId"
+      />
       <div class="section-heading">
         <h2>{{ selected.proposal.receiptId }} 증거 검토</h2>
         <span class="badge" :class="selected.status">{{

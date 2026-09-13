@@ -261,3 +261,45 @@ export async function downloadAssessment(
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+export function withAttachments(body: Record<string, unknown>, files: File[]) {
+  if (!files.length) return body;
+  const form = new FormData();
+  form.append(
+    "metadata",
+    new Blob([JSON.stringify(body)], { type: "application/json" }),
+  );
+  for (const file of files) form.append("files", file);
+  return form;
+}
+export async function downloadAttachment(
+  caseId: string,
+  id: string,
+  filename: string,
+) {
+  const response = await fetch(
+    `/api/v1/recalls/${encodeURIComponent(caseId)}/attachments/${encodeURIComponent(id)}/download`,
+    { credentials: "same-origin" },
+  );
+  if (!response.ok) {
+    if (response.status === 401) {
+      user.value = null;
+      csrf = null;
+    }
+    const data = await response.json().catch(() => null);
+    throw new Error(
+      data?.message ||
+        (response.status === 401
+          ? "로그인이 필요합니다."
+          : "첨부 다운로드에 실패했습니다."),
+    );
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

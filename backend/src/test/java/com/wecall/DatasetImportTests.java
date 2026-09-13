@@ -35,6 +35,11 @@ class DatasetImportTests {
         return req;
     }
     void empty() { assertThat(jdbc.queryForObject("SELECT count(*) FROM dataset",Long.class)).isZero(); }
+    @Test void csvSizeLimitRemainsFiveMiBAfterAttachmentSupport() throws Exception {
+        var req=multipart("/api/v1/datasets");req.param("asOf","2026-09-09T18:00:00+09:00");req.with(csrf());
+        for(var entry:FILES.entrySet())req.file(new MockMultipartFile(entry.getKey(),entry.getValue()+".csv","text/csv",entry.getKey().equals("products")?new byte[5*1024*1024+1]:Files.readAllBytes(Path.of("../samples/recall-001/"+entry.getValue()+".csv"))));
+        mvc.perform(req).andExpect(status().isPayloadTooLarge());empty();
+    }
     @Test void provenanceHashesOriginalBytesAndUsesAuthenticatedActor() throws Exception {
         mvc.perform(request("","","")).andExpect(status().isCreated());
         UUID id=jdbc.queryForObject("SELECT id FROM dataset",UUID.class);
