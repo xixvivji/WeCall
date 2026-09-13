@@ -41,7 +41,7 @@ jobs:
       WECALL_BOOTSTRAP_OPERATOR_PASSWORD: ci-disposable-operator-only
       WECALL_USERNAME: demo-reviewer
       WECALL_PASSWORD: ci-disposable-reviewer-only
-      WECALL_ATTACHMENT_DIR: ${{ runner.temp }}/wecall-attachments
+      WECALL_ATTACHMENT_DIR: /tmp/wecall-ci-attachments
       WECALL_AI_ALLOW_MOCK: 'false'
     steps:
       - uses: actions/checkout@v4
