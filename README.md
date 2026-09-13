@@ -7,6 +7,11 @@ PostgreSQL 기반 CSV 등록, 회수 사건·조건 등록·승인, 대상 판�
 
 - [프로젝트 개요와 개발 순서](docs/overview.md)
 - [통합 기획안 원문 (2026-09-09)](docs/product-plan-2026-09-09.md)
+- [MVP 요구사항·완료 기준](docs/mvp-requirements.md)
+- [현재 구성도](docs/design/architecture.md)
+- [파일·데이터 관리 초안](docs/design/file-data-policy.md)
+- [검증·시연 시나리오](docs/validation/demo-scenarios.md)
+- [실무 검증 자료 준비 양식](docs/validation/materials-checklist.md)
 
 ## 협업 규칙
 
@@ -24,7 +29,7 @@ Spring Boot는 업무 로직·조건 판정·승인·데이터 저장을 맡고,
 
 ## 설계·샘플 데이터
 
-- [논리 ERD 초안](docs/design/erd.md)
+- [구현 ERD](docs/design/erd.md)
 - [회수 사건·조건 승인·판정 API](docs/design/recall-api.md)
 - [입고 증거 보완·재판정 API](docs/design/evidence-api.md)
 - [대응 작업·처리 증빙 API](docs/design/task-api.md)
