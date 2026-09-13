@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 const sample = resolve("../samples/recall-001");
 // No credentials, traces, or login screenshots are persisted in test artifacts.
@@ -7,12 +7,25 @@ const credentials: Record<string, string> = { ...process.env } as Record<
   string,
   string
 >;
-for (const line of readFileSync(resolve("../.env"), "utf8").split("\n")) {
+const envFile = resolve("../.env");
+for (const line of (existsSync(envFile)
+  ? readFileSync(envFile, "utf8")
+  : ""
+).split("\n")) {
   if (line && !line.startsWith("#") && line.includes("=")) {
     const split = line.indexOf("=");
     const key = line.slice(0, split);
     if (!credentials[key]) credentials[key] = line.slice(split + 1);
   }
+}
+for (const key of [
+  "WECALL_USERNAME",
+  "WECALL_PASSWORD",
+  "WECALL_BOOTSTRAP_OPERATOR_USERNAME",
+  "WECALL_BOOTSTRAP_OPERATOR_PASSWORD",
+]) {
+  if (!credentials[key])
+    throw new Error(`브라우저 검증 환경 변수 누락: ${key}`);
 }
 async function signIn(page: Page, operator = false) {
   await page
@@ -350,6 +363,10 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     .fill("합성 시연용 작업. 실제 조치 기록이 아닙니다.");
   await page.getByRole("button", { name: "작업 등록", exact: true }).click();
   await page.getByRole("button", { name: "작업 상세" }).click();
+  await page.getByRole("button", { name: "로그아웃", exact: true }).click();
+  await signIn(page, true);
+  await page.getByRole("button", { name: "대응 작업", exact: true }).click();
+  await page.getByRole("button", { name: "작업 상세" }).click();
   await page.getByLabel("상태 변경 사유").fill("가상 작업 시작");
   await page.getByRole("button", { name: "작업 시작", exact: true }).click();
   await page
@@ -359,6 +376,8 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     .getByLabel("작업 증빙 파일", { exact: true })
     .setInputFiles(resolve("../samples/attachments/synthetic-checker.png"));
   await page.getByRole("button", { name: "증빙 제출" }).click();
+  await page.getByRole("button", { name: "로그아웃", exact: true }).click();
+  await signIn(page);
   await openFromInbox("PROOF");
   await expect(
     page.getByRole("button", {

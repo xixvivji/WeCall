@@ -18,3 +18,5 @@ frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
 .sites-runtime/
+
+validation-results/
