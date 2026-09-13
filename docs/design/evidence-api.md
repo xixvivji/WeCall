@@ -101,3 +101,5 @@ python3 scripts/demo_recall.py --with-evidence
 ## 화면과 목록 조회
 
 사건 상세의 입고 증거 탭에서 제안·원문 비교·승인·반려와 보완 후 판정 조회를 지원한다. 페이지와 상태 필터를 받는 GET `/api/v1/recalls/{caseId}/evidence`를 추가했다. 상세 계약은 [업무 화면 문서](frontend-workspace.md)를 참고한다.
+
+새 입고 증거 생성 시 PDF/PNG/JPEG 첨부를 함께 보낼 수 있다. 기존 텍스트 근거와 승인 기준은 유지한다. [multipart 계약](attachments-api.md)

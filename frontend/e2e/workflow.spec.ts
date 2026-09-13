@@ -200,6 +200,9 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     await page.getByLabel("문서의 입고일").fill("2026-09-04");
     await page.getByLabel("보완 제조번호").fill("A02");
     await page.getByLabel("보완 소비기한").fill("2026-10-31");
+    await page
+      .getByLabel("입고 증거 파일", { exact: true })
+      .setInputFiles(resolve("../samples/attachments/synthetic-checker.png"));
     await page.getByRole("button", { name: "증거 제안 저장" }).click();
     await expect(
       page.getByRole("heading", { name: "R4 증거 검토" }),
@@ -207,6 +210,32 @@ test("real backend workflow and role boundaries", async ({ page }) => {
   }
   await proposeEvidence("39");
   await openFromInbox("EVIDENCE");
+  const attachmentDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", {
+      name: "synthetic-checker.png 다운로드",
+      exact: true,
+    })
+    .click();
+  const downloadedAttachment = await attachmentDownload;
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "/tmp/wecall-attachments-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const attachmentStream = await downloadedAttachment.createReadStream();
+  const attachmentChunks: Buffer[] = [];
+  for await (const chunk of attachmentStream!)
+    attachmentChunks.push(Buffer.from(chunk));
+  expect(Buffer.concat(attachmentChunks)).toEqual(
+    readFileSync(resolve("../samples/attachments/synthetic-checker.png")),
+  );
   await expect(
     page.getByRole("heading", { name: "R4 증거 검토" }),
   ).toBeVisible();
@@ -326,8 +355,17 @@ test("real backend workflow and role boundaries", async ({ page }) => {
   await page
     .getByLabel("처리 증빙", { exact: true })
     .fill("합성 데이터 시연: 재고 격리 확인. 실제 작업 아님.");
+  await page
+    .getByLabel("작업 증빙 파일", { exact: true })
+    .setInputFiles(resolve("../samples/attachments/synthetic-checker.png"));
   await page.getByRole("button", { name: "증빙 제출" }).click();
   await openFromInbox("PROOF");
+  await expect(
+    page.getByRole("button", {
+      name: "synthetic-checker.png 다운로드",
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(page.locator(".proof.review-highlight")).toBeVisible();
   await page.getByLabel("증빙 검토 사유").fill("합성 근거 검토");
   await page.getByRole("button", { name: "증빙 승인", exact: true }).click();

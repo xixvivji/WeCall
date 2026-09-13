@@ -7,8 +7,8 @@ spring:
     password: ${DB_PASSWORD:wecall-local-only}
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 26MB
+      max-file-size: 10MB
+      max-request-size: 52MB
 server:
   servlet:
     session:
@@ -28,6 +28,8 @@ management:
     health:
       show-details: never
 wecall:
+  attachments:
+    directory: ${WECALL_ATTACHMENT_DIR:${user.home}/.wecall/attachments}
   ai:
     base-url: ${WECALL_AI_BASE_URL:http://127.0.0.1:8000}
     service-token: ${WECALL_AI_SERVICE_TOKEN:}

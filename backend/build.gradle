@@ -26,6 +26,9 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
     implementation 'org.apache.commons:commons-csv:1.14.1'
+    implementation('org.apache.pdfbox:pdfbox:3.0.8') {
+        exclude group: 'commons-logging', module: 'commons-logging'
+    }
     runtimeOnly 'org.postgresql:postgresql'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'

@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, nextTick } from "vue";
 import { useRoute } from "vue-router";
-import { api, user, label, errorText, dateText, type Assessment } from "../api";
+import FilePicker from "./FilePicker.vue";
+import Attachments from "./Attachments.vue";
+import {
+  withAttachments,
+  api,
+  user,
+  label,
+  errorText,
+  dateText,
+  type Assessment,
+} from "../api";
+const proofFiles = ref<File[]>([]);
+const proofPickerKey = ref(0);
 const route = useRoute();
 const props = defineProps<{
   caseId: string;
@@ -65,6 +77,8 @@ async function select(id: string) {
   selected.value = undefined;
   note.value = "";
   proof.value = "";
+  proofFiles.value = [];
+  proofPickerKey.value++;
   try {
     selected.value = await api(`/api/v1/recalls/${props.caseId}/tasks/${id}`);
     newAssignee.value = selected.value?.assignee || "";
@@ -102,10 +116,17 @@ async function act(path: string, body: Record<string, unknown>) {
   try {
     selected.value = await api(
       `/api/v1/recalls/${props.caseId}/tasks/${selected.value.id}/${path}`,
-      { ...body, expectedVersion: selected.value.version },
+      path === "proofs"
+        ? withAttachments(
+            { ...body, expectedVersion: selected.value.version },
+            proofFiles.value,
+          )
+        : { ...body, expectedVersion: selected.value.version },
     );
     note.value = "";
     proof.value = "";
+    proofFiles.value = [];
+    proofPickerKey.value++;
     await load();
   } catch (e) {
     error.value = errorText(e) + " 최신 작업을 다시 열고 확인하세요.";
@@ -283,7 +304,11 @@ onMounted(async () => {
               maxlength="100000"
               placeholder="실제 조치 대상·수량·처리 내용과 근거를 기록하세요"
             /></label
-          ><button :disabled="busy">증빙 제출</button>
+          ><FilePicker
+            :key="proofPickerKey"
+            v-model="proofFiles"
+            label="작업 증빙 파일"
+          /><button :disabled="busy">증빙 제출</button>
         </form>
         <form v-if="canWork && selected.status !== 'CANCELLED'" @submit.prevent>
           <label
@@ -338,6 +363,7 @@ onMounted(async () => {
           · {{ item.reviewRound }}회차 · {{ item.submittedBy }}</span
         >
         <p class="prewrap">{{ item.evidenceText }}</p>
+        <Attachments :case-id="caseId" :target-id="item.id" type="proofId" />
         <p v-if="item.reviewNote" class="small">
           검토 기록: {{ item.reviewNote }}
         </p>

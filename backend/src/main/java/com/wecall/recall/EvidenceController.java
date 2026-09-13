@@ -12,7 +12,7 @@ import static com.wecall.recall.EvidenceModels.*;
 public class EvidenceController {
     private final EvidenceService service;
     public EvidenceController(EvidenceService service) { this.service=service; }
-    @PostMapping @ResponseStatus(HttpStatus.CREATED)
+    @PostMapping(consumes="application/json") @ResponseStatus(HttpStatus.CREATED)
     public Map<String,Object> create(@PathVariable UUID caseId,@Valid @RequestBody NewEvidence body) { return service.create(caseId,body); }
     @GetMapping
     public Map<String,Object> list(@PathVariable UUID caseId,@RequestParam(defaultValue="") String status,
