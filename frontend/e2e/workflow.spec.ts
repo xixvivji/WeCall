@@ -202,6 +202,60 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     "10",
   ]);
   const newRun = await page.getByLabel("조회·작업 기준 판정").inputValue();
+  await page.getByRole("button", { name: "판정 비교", exact: true }).click();
+  await page.getByLabel("기준 판정", { exact: true }).selectOption(oldRun);
+  await page.getByLabel("비교 판정", { exact: true }).selectOption(newRun);
+  await page
+    .getByRole("button", { name: "판정 비교 실행", exact: true })
+    .click();
+  const comparison = page.getByRole("table", {
+    name: "판정 수량 비교",
+    exact: true,
+  });
+  await expect(comparison.locator("tbody tr").first()).toContainText("+30");
+  await expect(
+    page.getByText("데이터 버전이 다릅니다.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("table", { name: "기록별 판정 비교" })
+      .getByRole("cell", { name: "I4", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("비교 기록", { exact: true }).selectOption("shipments");
+  await expect(
+    page
+      .getByRole("table", { name: "기록별 판정 비교" })
+      .getByRole("cell", { name: "S4", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("table", { name: "기록별 판정 비교" })
+      .getByRole("cell", { name: "S2", exact: true }),
+  ).not.toBeVisible();
+  await page.getByLabel("변경된 기록만 보기").uncheck();
+  await expect(
+    page
+      .getByRole("table", { name: "기록별 판정 비교" })
+      .getByRole("cell", { name: "S2", exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "/tmp/wecall-comparison-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.getByLabel("기준 판정", { exact: true }).selectOption(newRun);
+  await expect(
+    page.getByRole("button", { name: "판정 비교 실행", exact: true }),
+  ).toBeDisabled();
+  await expect(comparison).not.toBeVisible();
+  await page.getByRole("button", { name: "영향 조회", exact: true }).click();
+
   await page.getByLabel("조회·작업 기준 판정").selectOption(oldRun);
   await expect(page.locator(".metric strong")).toHaveText([
     "110",

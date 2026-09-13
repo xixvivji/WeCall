@@ -17,6 +17,7 @@ import {
 import ConditionForm from "../components/ConditionForm.vue";
 import Tasks from "../components/Tasks.vue";
 import Closure from "../components/Closure.vue";
+import Comparison from "../components/Comparison.vue";
 import Evidence from "../components/Evidence.vue";
 const id = String(useRoute().params.id),
   recall = ref<CaseDetail>(),
@@ -157,6 +158,7 @@ onMounted(load);
         v-for="[value, name] in [
           ['overview', '원문 · 조건 검토'],
           ['impact', '영향 조회'],
+          ['comparison', '판정 비교'],
           ['evidence', '입고 증거'],
           ['tasks', '대응 작업'],
           ['closure', '종료 점검'],
@@ -245,7 +247,7 @@ onMounted(load);
         <ConditionForm :case-id="id" @saved="saved" /></section
     ></template>
     <template v-else
-      ><section class="panel">
+      ><section v-if="tab !== 'comparison'" class="panel">
         <label
           >조회·작업 기준 판정<select v-model="runId" @change="loadRun">
             <option value="">판정 선택</option>
@@ -384,6 +386,7 @@ onMounted(load);
           </div>
         </section></template
       >
+      <Comparison v-if="tab === 'comparison'" :case-id="id" :runs="runs" />
       <Evidence
         v-if="tab === 'evidence'"
         :case-id="id"
