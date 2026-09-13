@@ -1,69 +1,83 @@
-# 논리 ERD 초안
+# 구현 ERD와 데이터 사전
 
-상태: 전체 업무 모델은 설계 초안. DB는 PostgreSQL로 확정했으며 입력 데이터 6개 테이블(dataset, product, receipt, inventory, shipment, shipment_allocation)은 V1 마이그레이션으로 구현했다.
-단일 기업 MVP 기준이다. 다중 기업 지원 시 모든 조회·유일키·참조에 기업 경계를 추가해야 한다.
+기준: 2026-09-13, develop 20095d7. [Flyway V1~V9](../../backend/src/main/resources/db/migration/)의 실제 18개 테이블을 기준으로 한다. 단일 기업 모델이며 아래 선은 DB FK 관계다. 복합 FK의 정확한 컬럼은 데이터 사전·SQL을 따른다.
+
+## 입력 데이터
 
 ```mermaid
 erDiagram
-    PRODUCT ||--o{ RECEIPT : received
-    RECEIPT ||--o{ INVENTORY : stocked
-    PRODUCT ||--o{ SHIPMENT : shipped
-    SHIPMENT ||--o{ SHIPMENT_ALLOCATION : allocated
-    RECEIPT ||--o{ SHIPMENT_ALLOCATION : sourced
-    RECALL_CASE ||--o{ CONDITION_VERSION : conditions
-    RECALL_CASE ||--o{ PRODUCT_MATCH : candidates
-    PRODUCT ||--o{ PRODUCT_MATCH : reviewed
-    CONDITION_VERSION ||--o{ ASSESSMENT_RUN : evaluated
-    ASSESSMENT_RUN ||--o{ DECISION : produces
-    RECEIPT ||--o{ DECISION : assessed
-    RECALL_CASE ||--o{ EVIDENCE : collects
-    EVIDENCE ||--o{ RECEIPT_CORRECTION : supports
-    RECEIPT ||--o{ RECEIPT_CORRECTION : corrected
-    RECALL_CASE ||--o{ ACTION_TASK : requires
-    ACTION_TASK ||--o{ TASK_EVIDENCE : proves
-    EVIDENCE ||--o{ TASK_EVIDENCE : attached
-    RECALL_CASE ||--o{ AUDIT_EVENT : records
-    APP_USER ||--o{ ACTION_TASK : assigned
-    DATASET_VERSION ||--o{ ASSESSMENT_RUN : input
+    dataset ||--o{ product : contains
+    dataset ||--o{ dataset_source_file : uploaded_files
+    product ||--o{ receipt : receives
+    receipt ||--o{ inventory : stocks
+    product ||--o{ shipment : ships
+    shipment ||--o{ shipment_allocation : allocates
+    receipt ||--o{ shipment_allocation : supplies
 ```
 
-| 엔터티 | 주요 항목·제약 |
-| --- | --- |
-| PRODUCT | id, 상품명, 제조사, 규격, 수량 단위 |
-| RECEIPT | id, product_id, 제조번호 nullable, 소비기한 nullable, 입고량, 입고일, 데이터 버전 |
-| INVENTORY | id, receipt_id, 창고, 현재 수량, 보류 상태, 기준 시각 |
-| SHIPMENT | id, order_id, product_id, 출고량, 출고일 |
-| SHIPMENT_ALLOCATION | id, shipment_id, receipt_id, 연결 수량. 한 출고에 여러 입고 제조분 연결 가능 |
-| RECALL_CASE | id, 제목, 출처, 원문 문서, 담당자, 업무 상태 |
-| CONDITION_VERSION | id, case_id, 버전, 조건 트리, 원문 근거, 초안/승인/대체 상태, 승인자·시각 |
-| PRODUCT_MATCH | id, case_id, product_id, 후보/승인/거절 상태, 비교 근거, 검토자·시각 |
-| DATASET_VERSION | id, 원본 파일 해시·위치, 기준 시각, 검증 상태. 가져온 행은 버전에 귀속 |
-| ASSESSMENT_RUN | id, condition_version_id, dataset_version_id, 사용한 연결·보완 버전, 실행 상태·시각 |
-| DECISION | id, run_id, receipt_id, TARGET/NON_TARGET/NEEDS_REVIEW, 이유 코드, 근거. 실행+입고 유일 |
-| EVIDENCE | id, case_id, 파일 위치·해시, 문서 유형, 검토 상태 |
-| RECEIPT_CORRECTION | id, evidence_id, receipt_id, 변경 필드·전후 값, 승인자·시각. 원본 보존 |
-| ACTION_TASK | id, case_id, 대상 참조, 유형, 담당자, 상태, 완료 시각. 대상 판정과 독립 |
-| TASK_EVIDENCE | task_id, evidence_id. 복합 유일키 |
-| APP_USER | id, 사용자 식별자, REVIEWER/OPERATOR 역할 |
-| AUDIT_EVENT | id, case_id, 행위자, 행위, 대상, 전후 값, 시각. 추가 전용 |
+product, receipt, inventory, shipment, shipment_allocation의 PK는 `(dataset_id,id)`다. dataset에서 하위 행으로 이어지는 버전 범위를 참조하며 같은 id라도 다른 버전의 행과 구분한다.
 
-## 무결성과 판정 규칙
+| 테이블 | 키와 주요 컬럼 | DB 제약·의미 |
+| --- | --- | --- |
+| dataset | id UUID PK; as_of, created_at, uploaded_by nullable | 업로드 또는 증거 보완 스냅샷. uploaded_by는 과거 식별자를 보존하는 TEXT, 사용자 FK 아님 |
+| dataset_source_file | (dataset_id,file_type) PK; filename nullable, sha256, byte_size, row_count | dataset FK; 유형 5종 제한; SHA-256 형식·크기·행수 비음수. 파일 바이트 자체는 없음 |
+| product | 복합 PK; name, manufacturer, pack_size, unit | dataset FK; unit=EA |
+| receipt | 복합 PK; product_id, lot_number/expiry_date nullable, received_quantity, received_at | (dataset_id,product_id) FK; 입고량 ≥0; 상품을 포함한 복합 유일키 |
+| inventory | 복합 PK; receipt_id, warehouse, quantity, hold_status | 입고 복합 FK; quantity ≥0; NONE/HELD |
+| shipment | 복합 PK; order_id, product_id, quantity, shipped_at | 상품 복합 FK; quantity ≥0; 상품을 포함한 복합 유일키 |
+| shipment_allocation | 복합 PK; shipment_id, receipt_id, product_id, quantity | 출고·입고 각각 (dataset_id,id,product_id) FK로 상품 일치 보장; quantity >0 |
 
-- 수량은 0 이상이고 연결 수량은 양수다. 단위가 같아야 합산한다. 샘플은 정수 EA만 지원한다.
-- 출고별 연결량 합계는 출고량 이하여야 한다. 부족분은 추적 미확정이며 비대상에 합산하지 않는다.
-- 연결된 입고와 출고의 product_id가 같아야 한다. DB 제약과 트랜잭션 검증으로 보호할 항목이다.
-- 제조번호는 단독 식별키가 아니다. 입고 건과 상품을 함께 보며 누락 제조번호의 입고도 고유 ID로 유지한다.
-- 데이터 오류는 업로드 검증 오류로 처리하고, 정상 등록된 데이터의 판정 정보 누락과 구분한다.
-- 미승인 상품 후보는 비대상으로 단정하지 않는다. 샘플의 P1 연결 승인과 P2/P3 거절은 사람이 사전 검토한 정답이다.
-- 조건은 제한된 AND/OR 트리로 저장한다. 누락은 UNKNOWN으로 평가하고 FALSE AND UNKNOWN은 FALSE, TRUE OR UNKNOWN은 TRUE다. 남은 UNKNOWN만 확인 필요다.
-- 재판정은 새 실행을 생성한다. 이전 결과를 갱신하지 않으며 조건·데이터·상품 연결·승인된 보완의 정확한 버전을 기록한다.
-- 추가 증거 승인은 특정 입고 사실만 보완한다. 없는 출고 연결을 생성하지 않는다.
-- AI 분석 실행에는 요청 ID, 입력 해시, 모델·프롬프트 버전, 응답, 오류, 처리 시간을 기록한다. V7 extraction_job에 저장하며 상세 계약은 조건 추출 API 문서를 따른다.
+입고량 대비 재고+연결 출고 합계, 출고량 대비 연결 합계, 기준일과 입출고 날짜 검사는 CSV 서비스가 수행한다. 합계 제한이 단일 행 DB CHECK로 구현됐다고 해석하지 않는다.
 
-## 다음 구현 범위
+## 사건·판정·증거·작업
 
-CSV 검증·등록과 입력 스키마에 이어 사건·조건 버전·승인·판정 실행·영향 조회를 구현했다. V2는 recall_case, recall_condition, assessment_run을 추가하며 개별 판정은 assessment_run.result JSONB에 보존한다. 논리 모델의 상품 검토는 조건 정의에 포함한다. V3의 receipt_evidence는 입고 텍스트·제안값·검토 이력·기준/결과 판정을 보존한다. 보완 승인은 전체 데이터 스냅샷 복제와 재판정으로 구현했으며 별도 RECEIPT_CORRECTION 테이블은 아직 없다. V4의 response_task, response_task_proof, response_task_event로 수동 대응 작업·배정·증빙·검토·완료/재개 이력을 구현했다. V5에서 사건 OPEN/CLOSED 상태와 case_lifecycle_event로 종료 점검·승인·재개 이력을 구현했다. V6의 app_user로 로그인 계정과 REVIEWER/OPERATOR 역할을 구현했다. 신규 승인·작업 이력은 로그인 username을 사용하며 과거 라벨은 보존한다.
+```mermaid
+erDiagram
+    recall_case ||--o{ recall_condition : conditions
+    dataset ||--o{ recall_condition : input
+    recall_condition ||--o{ assessment_run : evaluates
+    recall_case ||--o{ receipt_evidence : evidence
+    assessment_run ||--o{ receipt_evidence : base_run
+    assessment_run o|--o| receipt_evidence : result_run
+    receipt ||--o{ receipt_evidence : base_receipt
+    dataset o|--o| receipt_evidence : result_dataset
+    recall_case ||--o{ response_task : tasks
+    assessment_run o|--o{ response_task : scoped_run
+    response_task ||--o{ response_task_proof : proofs
+    response_task ||--o{ response_task_event : history
+    recall_case ||--o{ case_lifecycle_event : lifecycle
+    assessment_run o|--o{ case_lifecycle_event : snapshot_run
+    recall_case ||--o{ extraction_job : extractions
+    recall_condition o|--o{ extraction_job : draft_result
+```
 
-## V7 조건 추출 작업
+| 테이블 | 주요 구조 | 제약·상태 |
+| --- | --- | --- |
+| recall_case | id UUID PK; title, source_type, source_text, created_at, status, lifecycle_version, closed_at | 출처 SUPPLIER/OFFICIAL/INTERNAL; OPEN/CLOSED와 closed_at 일관성 |
+| recall_condition | id PK; case_id FK, dataset_id FK, version, definition JSONB, status, approved_by/at | (case_id,version) 유일; DRAFT/APPROVED와 승인 정보 일관성 |
+| assessment_run | id PK; case_id, condition_id, dataset_id, result JSONB, created_at | (condition_id,case_id,dataset_id)로 조건 FK; id+사건 및 id+사건+데이터 복합 유일키 |
+| receipt_evidence | id PK; case_id; base_assessment_id/base_dataset_id/receipt_id; document_text/hash; proposal JSONB; status; 검토자·사유·시각; result_dataset_id/result_assessment_id | 사건·기준 판정·기준 입고 FK; 결과 판정의 사건/데이터 일치; 결과 데이터·판정 각각 유일; PENDING/APPROVED/REJECTED |
+| response_task | id PK; case_id; assessment_id nullable; task_type, target_type/target_id, title, instructions, assignee; status, version, review_round, completed_at | 사건 FK; 판정+사건 복합 FK; CASE는 target_id 없음, INVENTORY/SHIPMENT는 target_id·판정 필수; OPEN/IN_PROGRESS/COMPLETED/CANCELLED |
+| response_task_proof | id PK; task_id FK; review_round; evidence_text/hash; submitted_by/at; status; reviewed_by/note/at | 회차 >0; PENDING/ACCEPTED/REJECTED와 검토 정보 일관성 |
+| response_task_event | id PK; task_id FK; version, event_type, actor, details JSONB, created_at | (task_id,version) 유일 |
+| case_lifecycle_event | id PK; case_id FK; version, event_type, assessment_id nullable, reviewer, note, snapshot JSONB, created_at | (case_id,version) 유일; CLOSED/REOPENED; CLOSED는 판정 필수; 판정+사건 FK |
+| extraction_job | id PK; case_id FK; requested_by; source_text/hash; status, review_status; response JSONB/raw_response; error_code, duration_ms, 시각; reviewed_by/note/at; condition_id nullable FK | QUEUED/RUNNING/SUCCEEDED/FAILED; PENDING/ACCEPTED/DISMISSED; 진행 작업 사건별 하나인 부분 유일 인덱스 |
 
-`recall_case` 1:N `extraction_job`. 원문·SHA-256, 처리 상태, 원본 응답·검증 결과, 오류, 시간, 요청자·검토자를 보존한다. 성공 결과를 검토하면 `condition_id`로 별도 `recall_condition` 초안을 연결한다. 진행 중인 작업은 사건별 하나로 제한한다.
+현재 상품 연결 검토는 `recall_condition.definition` 안에 productReviews·원문 인용·조건 트리로 보존한다. 개별 입고 판정 및 재고·출고 영향은 `assessment_run.result` 안에 저장한다. PRODUCT_MATCH·DECISION·RECEIPT_CORRECTION이라는 별도 테이블은 없다. 모델·프롬프트 정보는 추출 응답 계약 내 값이며 별도 모델 테이블은 없다.
+
+증거 승인 시 새 dataset을 복제·보완하고 새 조건/판정을 만든다. 부모 데이터 컬럼을 dataset에 중복 저장하지 않고 승인 증거의 base/result 관계로 출처를 조회한다. 원본 CSV 해시를 보완 데이터의 직접 업로드 파일로 복사하지 않는다.
+
+## 계정과 감사
+
+| 테이블 | 키와 주요 컬럼 | 의미 |
+| --- | --- | --- |
+| app_user | username VARCHAR(64) PK; display_name, password_hash, role, enabled, created_at, security_version | REVIEWER/OPERATOR; BCrypt 저장; 보안 변경 시 버전 증가 |
+| account_security_event | id UUID PK; username, actor, event_type, note, created_at | PASSWORD_CHANGED/DISABLED/ENABLED; username·actor는 FK가 아님 |
+
+assignee, 승인자·등록자·이력 actor 등 사용자 문자열에는 DB 사용자 FK를 두지 않는다. 신규 HTTP 요청은 로그인 계정에서 행위자를 결정하고 작업 배정은 활성 계정을 서비스에서 검증한다. 과거 식별자와 라벨은 보존한다. `response_task.target_id`도 실제 재고/출고 테이블 FK가 아니라 지정 판정 결과 안에서 서비스가 확인한다.
+
+## 변경 원칙과 한계
+
+대상 판정·상품 연결·조치 상태는 독립이다. 승인 조건과 판정 결과는 애플리케이션 경로에서 덮어쓰지 않으며 증거 보완은 새 버전을 만든다. DB 관리자까지 차단하는 WORM 저장소나 전 테이블 수정 방지 트리거가 있다는 의미는 아니다. 파일 첨부·세션 테이블·범용 감사 로그 테이블·기업 tenant 테이블은 현재 없다.
+
+새 기능에서 스키마를 바꾸면 마이그레이션과 이 문서를 같은 작업에서 갱신한다. 예정된 파일 테이블은 구현 전이므로 이 ERD에 포함하지 않는다.
