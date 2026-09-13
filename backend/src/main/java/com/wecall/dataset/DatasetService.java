@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.charset.CodingErrorAction;
 import java.time.*;
 import java.util.*;
+import java.security.*;
 
 @Service
 public class DatasetService {
@@ -36,6 +37,17 @@ public class DatasetService {
         long total=jdbc.queryForObject("SELECT count(*) FROM product"+where,Long.class,id,query.strip(),query.strip());
         var rows=jdbc.queryForList("SELECT id,name,manufacturer,pack_size AS \"packSize\",unit FROM product"+where+" ORDER BY id LIMIT ? OFFSET ?",id,query.strip(),query.strip(),size,(long)page*size);
         return Map.of("items",rows,"page",page,"size",size,"totalElements",total,"totalPages",(total+size-1)/size);
+    }
+    @Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public Map<String,Object> provenance(UUID id) {
+        var rows=jdbc.queryForList("SELECT id,as_of AS \"asOf\",created_at AS \"createdAt\",uploaded_by AS \"uploadedBy\" FROM dataset WHERE id=?",id);
+        if(rows.isEmpty())throw new com.wecall.recall.RecallService.Failure(org.springframework.http.HttpStatus.NOT_FOUND,"데이터 버전이 없습니다");
+        var result=new LinkedHashMap<String,Object>(rows.getFirst());
+        var files=jdbc.queryForList("SELECT file_type AS \"type\",filename,sha256,byte_size AS \"byteSize\",row_count AS \"rowCount\" FROM dataset_source_file WHERE dataset_id=? ORDER BY file_type",id);
+        var derived=jdbc.queryForList("SELECT id AS \"evidenceId\",case_id AS \"caseId\",base_dataset_id AS \"parentDatasetId\",reviewed_by AS \"reviewedBy\",reviewed_at AS \"reviewedAt\" FROM receipt_evidence WHERE result_dataset_id=? AND status='APPROVED'",id);
+        result.put("source",!derived.isEmpty()?"EVIDENCE":!files.isEmpty()?"CSV":"LEGACY");
+        result.put("files",files);result.put("derivation",derived.isEmpty()?null:derived.getFirst());
+        return result;
     }
     private static final Map<String, String> HEADERS = Map.of(
         "products", "product_id,name,manufacturer,pack_size,unit",
@@ -119,6 +131,11 @@ public class DatasetService {
 
     @Transactional
     public Map<String, Object> importFiles(OffsetDateTime asOf, Map<String, MultipartFile> uploads) {
+        return importFiles(asOf,uploads,null);
+    }
+    @Transactional
+    public Map<String,Object> importFiles(OffsetDateTime asOf,Map<String,MultipartFile> uploads,String actor) {
+
         List<ImportError> errors = new ArrayList<>();
         Map<String, Map<String, Row>> data = new LinkedHashMap<>();
         for (String file : FILES) data.put(file, parse(file, uploads.get(file), errors));
@@ -149,7 +166,18 @@ public class DatasetService {
         }
         reject(errors);
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO dataset(id,as_of) VALUES (?,?)",id,asOf);
+        jdbc.update("INSERT INTO dataset(id,as_of,uploaded_by) VALUES (?,?,?)",id,asOf,actor);
+        for(String file:FILES) {
+            MultipartFile upload=uploads.get(file);
+            String filename=upload.getOriginalFilename();
+            if(filename!=null){filename=filename.replace('\\','/');filename=filename.substring(filename.lastIndexOf('/')+1).replaceAll("[\\p{Cntrl}]","_");if(filename.isBlank())filename=null;}
+            try {
+                var digest=MessageDigest.getInstance("SHA-256");long size;
+                try(var input=new DigestInputStream(upload.getInputStream(),digest)){size=input.transferTo(OutputStream.nullOutputStream());}
+                jdbc.update("INSERT INTO dataset_source_file(dataset_id,file_type,filename,sha256,byte_size,row_count) VALUES (?,?,?,?,?,?)",id,file,filename,HexFormat.of().formatHex(digest.digest()),size,data.get(file).size());
+            } catch(IOException e){throw new InvalidDataset(List.of(new ImportError(file+".csv",0,"file","원본 파일 해시를 읽을 수 없습니다")));}
+            catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}
+        }
         for (Row r : data.get("products").values()) jdbc.update("INSERT INTO product VALUES (?,?,?,?,?,?)",id,r.id(),r.get("name"),r.get("manufacturer"),r.get("pack_size"),r.get("unit"));
         for (Row r : data.get("receipts").values()) jdbc.update("INSERT INTO receipt VALUES (?,?,?,?,?,?,?)",id,r.id(),r.get("product_id"),r.get("lot_number").isEmpty()?null:r.get("lot_number"),r.get("expiry_date").isEmpty()?null:LocalDate.parse(r.get("expiry_date")),r.quantity("received_quantity"),LocalDate.parse(r.get("received_at")));
         for (Row r : data.get("inventory").values()) jdbc.update("INSERT INTO inventory VALUES (?,?,?,?,?,?)",id,r.id(),r.get("receipt_id"),r.get("warehouse"),r.quantity("quantity"),r.get("hold_status"));
