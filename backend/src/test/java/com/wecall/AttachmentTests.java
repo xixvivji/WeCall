@@ -32,6 +32,7 @@ class AttachmentTests {
     @DynamicPropertySource static void config(DynamicPropertyRegistry r){r.add("wecall.attachments.directory",()->ROOT.toString());}
     @Autowired MockMvc mvc;@Autowired JdbcTemplate jdbc;@Autowired ObjectMapper json;@Autowired DatasetService datasets;@Autowired RecallService recalls;@Autowired TaskService tasks;@Autowired AttachmentService attachments;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean LocalAttachmentStorage storage;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean ClamdScanner scanner;
     UUID caseId,taskId;byte[] png;
     @BeforeEach void setup() throws Exception {
         jdbc.execute("TRUNCATE dataset,recall_case CASCADE");
@@ -48,6 +49,30 @@ class AttachmentTests {
     }
     UUID onlyId(){return jdbc.queryForObject("SELECT id FROM evidence_attachment",UUID.class);}
     long diskCount() throws IOException {try(var files=Files.list(ROOT)){return files.count();}}
+    @Test void scanFailuresRollbackProofTaskAndAllAttachments() throws Exception {
+        for(var code:List.of(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE)) {
+            org.mockito.Mockito.doReturn(new MalwareScanner.Receipt("CLEAN","clamd",OffsetDateTime.now()))
+                .doThrow(new RecallService.Failure(code,"검사 차단"))
+                .when(scanner).scan(org.mockito.ArgumentMatchers.any(byte[].class));
+            var req=request("one.png",png).file(new MockMultipartFile("files","two.png","image/png",png));
+            mvc.perform(req).andExpect(status().is(code.value()));
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM response_task_proof",Long.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM evidence_attachment",Long.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT version FROM response_task WHERE id=?",Long.class,taskId)).isEqualTo(1L);
+            assertThat(diskCount()).isZero();
+            org.mockito.Mockito.reset(scanner);
+        }
+    }
+    @Test void cleanReceiptPersistsAndDownloadsMustPassANewScan() throws Exception {
+        org.mockito.Mockito.doReturn(new MalwareScanner.Receipt("CLEAN","clamd",OffsetDateTime.now())).when(scanner).scan(org.mockito.ArgumentMatchers.any(byte[].class));
+        mvc.perform(request("clean.png",png)).andExpect(status().isCreated());UUID id=onlyId();
+        assertThat(jdbc.queryForObject("SELECT scan_status FROM evidence_attachment",String.class)).isEqualTo("CLEAN");
+        assertThat(jdbc.queryForObject("SELECT scanned_at FROM evidence_attachment",OffsetDateTime.class)).isNotNull();
+        org.mockito.Mockito.doThrow(new RecallService.Failure(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,"검사 차단")).when(scanner).scan(org.mockito.ArgumentMatchers.any(byte[].class));
+        mvc.perform(get("/api/v1/recalls/"+caseId+"/attachments/"+id+"/download")).andExpect(status().isUnprocessableEntity());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM attachment_event WHERE event_type='DOWNLOAD_REQUESTED'",Long.class)).isZero();
+        assertThat(diskCount()).isEqualTo(1);
+    }
     @Test void assignedProofUploadDownloadAndAuditPreserveOriginalBytes() throws Exception {
         mvc.perform(request("합성.png",png).with(user("operator").roles("OPERATOR"))).andExpect(status().isCreated());
         UUID id=onlyId();
