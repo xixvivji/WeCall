@@ -6,7 +6,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
-@RestControllerAdvice(assignableTypes = {CaseHistoryController.class,com.wecall.attachment.AttachmentController.class,AssessmentExportController.class, WorkspaceController.class, RecallController.class, EvidenceController.class, TaskController.class, ClosureController.class, ExtractionController.class, com.wecall.auth.AuthController.class})
+@RestControllerAdvice(assignableTypes = {CaseReportController.class,CaseHistoryController.class,com.wecall.attachment.AttachmentController.class,AssessmentExportController.class, WorkspaceController.class, RecallController.class, EvidenceController.class, TaskController.class, ClosureController.class, ExtractionController.class, com.wecall.auth.AuthController.class})
 class RecallErrors {
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     ResponseEntity<?> attachmentTooLarge(Exception e){return ResponseEntity.status(413).body(Map.of("code","UPLOAD_TOO_LARGE","message","첨부 파일당 10 MiB, 요청당 52 MiB 제한입니다"));}

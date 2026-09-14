@@ -14,6 +14,7 @@ import {
   type Assessment,
   type Rule,
 } from "../api";
+import CaseReport from "../components/CaseReport.vue";
 import CaseHistory from "../components/CaseHistory.vue";
 import ConditionForm from "../components/ConditionForm.vue";
 import Tasks from "../components/Tasks.vue";
@@ -182,6 +183,7 @@ onMounted(async () => {
           ['tasks', '대응 작업'],
           ['closure', '종료 점검'],
           ['history', '업무 이력'],
+          ['report', '대응 보고서'],
         ]"
         :key="value"
         :class="{ active: tab === value }"
@@ -410,6 +412,11 @@ onMounted(async () => {
           </div>
         </section></template
       >
+      <CaseReport
+        v-if="tab === 'report'"
+        :case-id="id"
+        :assessment-id="runId || undefined"
+      />
       <CaseHistory
         v-if="tab === 'history'"
         :case-id="id"
