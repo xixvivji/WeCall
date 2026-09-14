@@ -4,7 +4,7 @@
 
 저장소 루트에서 `docker compose up -d postgres`, 이어서 `cd backend && ./gradlew bootRun`.
 PostgreSQL 17.6을 로컬 5432 포트에 실행한다. 기존 DB가 이 포트를 사용하면 Compose 포트와 DB_URL을 함께 변경한다.
-Flyway가 V1 스키마를 자동 적용한다. 런타임 스키마 자동 생성은 사용하지 않는다.
+Flyway가 저장소의 누적 마이그레이션을 자동 적용한다. 런타임 스키마 자동 생성은 사용하지 않는다.
 
 기본 접속: DB `wecall`, 사용자 `wecall`, 비밀번호 `wecall-local-only` (로컬 개발 전용).
 Spring 설정은 DB_URL, DB_USERNAME, DB_PASSWORD로 변경한다. Compose는 DB_PASSWORD를 읽는다.
@@ -33,7 +33,7 @@ curl --fail-with-body http://127.0.0.1:8080/api/v1/datasets \
 
 - UTF-8(BOM 허용), 샘플과 동일한 헤더·순서. CSV 인용 및 쉼표 필드를 지원한다.
 - 오류 `row`는 헤더를 1로 센 논리 레코드 번호다. 인용 필드에 줄바꿈이 있으면 물리 줄 번호와 다를 수 있다. 파싱 실패는 0이다.
-- 파일당 5MB·10000개 데이터 행, 요청당 26MB. 텍스트 필드는 최대 500자.
+- 파일당 5 MiB·10000개 데이터 기록, 전체 파일 26 MiB. 텍스트 필드는 최대 500자.
 - 수량은 0~10억의 정수 EA. 출고 연결량은 1 이상. 다른 단위는 아직 지원하지 않는다.
 - 날짜는 YYYY-MM-DD. 기준 시각은 오프셋 포함 ISO 8601. 입출고 날짜는 입력 오프셋 기준 기준일 이하여야 한다.
 - 제조번호·소비기한 빈 값은 NULL로 보존한다. 나머지 필드는 필수다.
@@ -42,7 +42,7 @@ curl --fail-with-body http://127.0.0.1:8080/api/v1/datasets \
 - 재고+연결 출고가 입고량 이하면 허용한다. 부족분으로 출고 연결을 추정하지 않는다.
 - 연결량이 출고량보다 적어도 등록 가능하다. 미연결 수량을 별도로 반환하며 비대상을 뜻하지 않는다.
 - 헤더만 있는 파일은 빈 목록으로 허용한다. 아직 모든 품목·기간을 커버한다는 보장은 없다.
-- 400 INVALID_DATASET: errors 배열에 file, row, field, message. 필드 형식 → 참조 → 수량 검증 순으로 오류를 반환한다.
+- 400 INVALID_DATASET: errors 배열에 file, row, field, message. 상세는 앞 200건으로 제한하며 errorCount에 현재 단계의 전체 발견 건수, truncated에 상세 생략 여부를 반환한다. 필드 형식 → 참조 → 수량 검증 순으로 오류를 반환한다.
 - 400 INVALID_REQUEST: 필수 multipart 필드 또는 asOf 누락·형식 오류.
 - 413 UPLOAD_TOO_LARGE: 업로드 용량 초과.
 
@@ -54,7 +54,7 @@ curl --fail-with-body http://127.0.0.1:8080/api/v1/datasets \
 
 JDBC + Flyway로 일괄 등록을 구현했다. JPA 엔터티는 아직 도입하지 않았다.
 [로그인한 검토자와 CSRF 헤더](auth-api.md)가 필요하다. 기본 바인딩은 127.0.0.1이다. 파일별 해시·크기·행수·등록자 추적은 아래 출처 API로 제공한다. 원본 파일 자체 보관·재다운로드는 후속 범위다.
-현재 dataset은 불변 입력 스냅샷이며 논리 ERD의 전체 사건·승인 모델은 아직 테이블화하지 않았다.
+dataset은 불변 입력 스냅샷이며 현재 구현된 사건·조건·증거·작업·이력 관계는 [ERD](erd.md)를 따른다.
 
 ## 검증
 
@@ -81,3 +81,13 @@ Testcontainers가 별도 PostgreSQL을 만들기 때문에 개발 DB 데이터�
 파일 원본 자체는 영구 보관하지 않으며 재다운로드 API도 없다. 해시는 파일 식별 정보로, 문서 내용의 진위·정확성을 증명하지 않는다. V9 이전 데이터의 파일 정보·등록자는 추정하여 채우지 않는다.
 
 증거 보완 버전은 기존 승인 증거의 result_dataset_id 관계를 조회해서 EVIDENCE로 표시한다. 기준 데이터의 파일 해시를 보완 데이터의 직접 업로드 파일처럼 복사하지 않는다. 기존 승인 증거로 만들어진 버전도 확인 가능한 관계만 표시하며, 기준 데이터 링크를 따라 이전 CSV 출처로 이동할 수 있다. 출처 조회는 데이터·판정을 수정하지 않는다.
+
+## 작성 양식 API와 오류 화면
+
+- `GET /api/v1/datasets/templates`: 5종의 type·multipart field·한글 label·columns(name/label/required/guidance/example).
+- `GET /api/v1/datasets/templates/{type}.csv`: 해당 종류의 UTF-8 BOM+헤더+CRLF만 포함한 빈 양식.
+- `GET /api/v1/datasets/templates.zip`: 빈 CSV 5개와 UTF-8 `작성안내.txt`. 예시 데이터 행은 없다.
+
+두 역할의 로그인 사용자가 읽을 수 있고 비로그인은401, 알 수 없는 type은404다. 양식의 헤더는 CsvSchema를 통해 실제 파서와 동일 정의를 사용한다. 스키마나 실제 데이터는 변경하지 않는다.
+
+프론트는 구조화된 오류를 파일·행·항목·메시지 표로 표시한다. 파일별 필터, 20건씩 이동, 실제 선택 파일명, 선택 파일 보존을 지원한다. row=0은 `파일 전체`로 표시한다. [사용자 작성·수정 안내](../validation/csv-authoring-guide.md)를 참고한다.

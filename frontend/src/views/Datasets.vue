@@ -1,13 +1,31 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed, nextTick } from "vue";
 import {
   api,
+  ApiError,
+  type ValidationIssue,
   user,
   errorText,
   dateText,
   type Page,
   type Dataset,
 } from "../api";
+import CsvTemplates from "../components/CsvTemplates.vue";
+const errorNotice = ref<HTMLElement>(),
+  successNotice = ref<HTMLElement>();
+const issues = ref<ValidationIssue[]>([]),
+  issueCount = ref(0),
+  issueFile = ref(""),
+  issuePage = ref(0),
+  uploadedNames = ref<Record<string, string>>({});
+const filteredIssues = computed(() =>
+  issues.value.filter(
+    (row) => !issueFile.value || row.file === issueFile.value,
+  ),
+);
+const visibleIssues = computed(() =>
+  filteredIssues.value.slice(issuePage.value * 20, (issuePage.value + 1) * 20),
+);
 const page = ref(0),
   data = ref<Page<Dataset>>(),
   error = ref(""),
@@ -46,8 +64,20 @@ async function upload() {
   busy.value = true;
   error.value = "";
   success.value = "";
+  issues.value = [];
+  issueCount.value = 0;
+  issueFile.value = "";
+  issuePage.value = 0;
   try {
     const body = new FormData(form.value);
+    uploadedNames.value = Object.fromEntries(
+      files.map(([key]) => [
+        key === "shipmentAllocations"
+          ? "shipment_allocations.csv"
+          : key + ".csv",
+        (body.get(key) as File)?.name || "",
+      ]),
+    );
     body.set("asOf", new Date(asOf.value).toISOString());
     const result = await api<{
       datasetId: string;
@@ -58,8 +88,14 @@ async function upload() {
     asOf.value = "";
     page.value = 0;
     await load();
+    await nextTick();
+    successNotice.value?.focus();
   } catch (e) {
-    error.value = errorText(e);
+    if (e instanceof ApiError && e.issues.length) {
+      issues.value = e.issues;
+      issueCount.value = e.issueCount;
+      error.value = "CSV 검증에 실패했습니다. 데이터는 등록되지 않았습니다.";
+    } else error.value = errorText(e);
   } finally {
     busy.value = false;
   }
@@ -76,13 +112,104 @@ onMounted(load);
       </p>
     </div>
   </div>
-  <p v-if="error" class="error" role="alert">{{ error }}</p>
-  <p v-if="success" class="success" role="status">{{ success }}</p>
+  <p v-if="error" ref="errorNotice" tabindex="-1" class="error" role="alert">
+    {{ error }}
+  </p>
+  <section
+    v-if="issues.length"
+    class="panel csv-errors"
+    aria-label="CSV 오류 내역"
+  >
+    <h2>CSV 오류 내역</h2>
+    <p>
+      {{ issueCount }}건의 오류를 확인했습니다.
+      <span v-if="issueCount > issues.length"
+        >앞 {{ issues.length }}건을 표시합니다. 수정 후 다시 등록하면 나머지
+        오류를 확인할 수 있습니다.</span
+      >
+    </p>
+    <p class="note">
+      행 번호는 헤더를 1행으로 센 CSV 기록 번호입니다. 셀 안의 줄바꿈은 새
+      행으로 세지 않습니다. 파일 전체 오류는 행 번호를 특정하지 못한 경우입니다.
+      선택한 파일은 유지됩니다. 원본을 수정한 뒤 파일을 다시 선택하고 5종을 함께
+      등록하세요.
+    </p>
+    <label
+      >오류 파일<select
+        v-model="issueFile"
+        aria-label="오류 파일"
+        @change="issuePage = 0"
+      >
+        <option value="">모든 파일</option>
+        <option
+          v-for="file in [
+            ...new Set(issues.map((e) => e.file).filter(Boolean)),
+          ]"
+          :key="file"
+          :value="file"
+        >
+          {{ file }}
+        </option>
+      </select></label
+    >
+    <div class="table-scroll">
+      <table aria-label="CSV 검증 오류">
+        <thead>
+          <tr>
+            <th>파일 종류 / 선택 파일</th>
+            <th>행</th>
+            <th>항목</th>
+            <th>수정할 내용</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(issue, index) in visibleIssues" :key="index">
+            <td>
+              {{ issue.file || "파일 전체"
+              }}<small v-if="issue.file && uploadedNames[issue.file]">{{
+                uploadedNames[issue.file]
+              }}</small>
+            </td>
+            <td>{{ issue.row ? issue.row + "행" : "파일 전체" }}</td>
+            <td>{{ issue.field || "전체" }}</td>
+            <td>{{ issue.message }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <footer class="pagination">
+      <span
+        >{{ filteredIssues.length }}건 중 {{ issuePage * 20 + 1 }}–{{
+          Math.min((issuePage + 1) * 20, filteredIssues.length)
+        }}</span
+      >
+      <div>
+        <button :disabled="issuePage === 0" @click="issuePage--">
+          오류 이전</button
+        ><button
+          :disabled="(issuePage + 1) * 20 >= filteredIssues.length"
+          @click="issuePage++"
+        >
+          오류 다음
+        </button>
+      </div>
+    </footer>
+  </section>
+  <p
+    v-if="success"
+    ref="successNotice"
+    tabindex="-1"
+    class="success"
+    role="status"
+  >
+    {{ success }}
+  </p>
   <section v-if="user?.roles.includes('REVIEWER')" class="panel">
     <h2>CSV 데이터 등록</h2>
+    <CsvTemplates />
     <p class="note">
-      UTF-8 CSV 5종을 함께 등록하세요. 파일당 5MB, 10,000행까지 지원합니다. 연결
-      기록은 실제 확인된 내용만 입력하세요.
+      UTF-8 CSV 5종을 함께 등록하세요. 파일당 5 MiB, 데이터 10,000행까지
+      지원합니다. 연결 기록은 실제 확인된 내용만 입력하세요.
     </p>
     <form ref="form" @submit.prevent="upload">
       <label
@@ -171,3 +298,14 @@ onMounted(load);
     </footer>
   </section>
 </template>
+
+<style scoped>
+.csv-errors td {
+  overflow-wrap: anywhere;
+  max-width: 420px;
+}
+.csv-errors small {
+  display: block;
+  color: #56665e;
+}
+</style>

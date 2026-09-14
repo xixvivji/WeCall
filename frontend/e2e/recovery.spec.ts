@@ -58,7 +58,7 @@ for (const kind of ["cases", "datasets"] as const) {
       cases ? "조건에 맞는 사건이 없습니다" : "등록된 데이터가 없습니다.",
       { exact: true },
     );
-    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(page.locator(".list-panel tbody tr")).toHaveCount(1);
     await expect(
       page.getByRole("button", { name: "이전", exact: true }),
     ).toBeDisabled();
@@ -68,10 +68,10 @@ for (const kind of ["cases", "datasets"] as const) {
       "서버에 연결할 수 없습니다",
     );
     await expect(empty).not.toBeVisible();
-    await expect(page.locator("tbody tr")).toHaveCount(0);
+    await expect(page.locator(".list-panel tbody tr")).toHaveCount(0);
     mode = "page";
     await page.getByRole("button", { name: "다시 시도", exact: true }).click();
-    await expect(page.locator("tbody tr")).toContainText(
+    await expect(page.locator(".list-panel tbody tr")).toContainText(
       cases ? "합성 페이지 2" : "bbbbbbbb",
     );
     await expect(

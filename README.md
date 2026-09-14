@@ -130,3 +130,5 @@ API 키와 비밀번호는 Git에 올리지 않습니다. `.env` 파일은 Git�
 [CI 실행 범위·확인 방법](docs/validation/ci.md) · [합성 업무 검증 결과](docs/validation/report-2026-09-13.md). 푸시·PR마다 백엔드 테스트, 프론트 빌드, 브라우저 및 HTTP 업무 흐름을 검사합니다. 배포는 수행하지 않습니다.
 
 사건 상세의 **업무 이력** 탭에서 조건 승인·입고 증거 검토·작업 변경·증빙 검토·종료/재개 기록을 시간순으로 조회할 수 있습니다. [조회 범위와 API](docs/design/case-history-api.md)
+
+데이터 관리에서 빈 CSV 양식 5종 ZIP과 항목별 작성 안내를 제공합니다. 등록 오류는 파일·행·항목별 표에서 확인하고 수정할 수 있습니다. [CSV 작성·수정 안내](docs/validation/csv-authoring-guide.md)
