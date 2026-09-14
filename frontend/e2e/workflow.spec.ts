@@ -336,6 +336,10 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     .getByLabel("작업 증빙 파일", { exact: true })
     .setInputFiles(resolve("../samples/attachments/synthetic-checker.png"));
   await page.getByRole("button", { name: "증빙 제출" }).click();
+  await expect(page.locator(".proof")).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: "증빙 제출", exact: true }),
+  ).toBeEnabled();
   await page.getByRole("button", { name: "로그아웃", exact: true }).click();
   await signIn(page);
   await openFromInbox("PROOF");
