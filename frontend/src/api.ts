@@ -22,17 +22,31 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
     if (!(body instanceof FormData) && !(body instanceof URLSearchParams))
       headers["Content-Type"] = "application/json";
   }
-  const response = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
-    credentials: "same-origin",
-    headers,
-    body:
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method: body === undefined ? "GET" : "POST",
+      credentials: "same-origin",
+      headers,
+      body:
+        body === undefined
+          ? undefined
+          : body instanceof FormData || body instanceof URLSearchParams
+            ? body
+            : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(
+      0,
       body === undefined
-        ? undefined
-        : body instanceof FormData || body instanceof URLSearchParams
-          ? body
-          : JSON.stringify(body),
-  });
+        ? "서버에 연결할 수 없습니다. 연결 상태를 확인한 뒤 다시 조회하세요."
+        : "서버 응답을 받지 못했습니다. 다시 제출하기 전에 목록이나 상세에서 반영 여부를 확인하세요.",
+    );
+  }
+  if (response.status === 401) {
+    user.value = null;
+    csrf = null;
+  }
   const text = await response.text();
   let data;
   try {

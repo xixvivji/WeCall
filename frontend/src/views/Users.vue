@@ -46,6 +46,7 @@ async function select(account: Account) {
   }
 }
 async function changeStatus() {
+  if (busy.value) return;
   if (!selected.value) return;
   ++detailRequest;
   busy.value = true;
@@ -85,6 +86,7 @@ async function load() {
   }
 }
 async function create() {
+  if (busy.value) return;
   busy.value = true;
   error.value = "";
   success.value = "";

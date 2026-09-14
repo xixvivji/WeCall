@@ -20,6 +20,7 @@ const router = useRouter(),
   data = ref<Page<CaseRow>>(),
   loading = ref(false),
   error = ref(""),
+  createError = ref(""),
   creating = ref(false),
   saving = ref(false);
 const title = ref(""),
@@ -29,6 +30,7 @@ let generation = 0;
 async function load(reset = false) {
   if (reset) page.value = 0;
   const ticket = ++generation;
+  data.value = undefined;
   loading.value = true;
   error.value = "";
   try {
@@ -50,8 +52,9 @@ async function load(reset = false) {
   }
 }
 async function create() {
+  if (saving.value) return;
   saving.value = true;
-  error.value = "";
+  createError.value = "";
   try {
     const result = await api<CaseRow>("/api/v1/recalls", {
       title: title.value,
@@ -60,7 +63,7 @@ async function create() {
     });
     await router.push("/recalls/" + result.id);
   } catch (e) {
-    error.value = errorText(e);
+    createError.value = errorText(e);
   } finally {
     saving.value = false;
   }
@@ -98,6 +101,7 @@ onUnmounted(() => {
   </div>
   <section v-if="creating" class="panel">
     <h2>새 회수 사건</h2>
+    <p v-if="createError" class="error" role="alert">{{ createError }}</p>
     <form @submit.prevent="create">
       <div class="form-grid">
         <label
@@ -156,16 +160,16 @@ onUnmounted(() => {
     </p>
     <div class="list-caption">
       <strong>사건 목록</strong
-      ><span class="muted">{{ data?.totalElements ?? 0 }}건</span>
+      ><span v-if="data" class="muted">{{ data.totalElements }}건</span>
     </div>
     <div v-if="loading" class="empty" role="status">
       사건을 불러오는 중입니다…
     </div>
-    <div v-else-if="!data?.items.length" class="empty">
+    <div v-else-if="!error && data && !data.items.length" class="empty">
       <h3>조건에 맞는 사건이 없습니다</h3>
       <p>검색 조건을 바꾸거나 새 회수 사건을 등록하세요.</p>
     </div>
-    <div v-else class="table-scroll">
+    <div v-else-if="!error && data" class="table-scroll">
       <table>
         <thead>
           <tr>
@@ -208,7 +212,7 @@ onUnmounted(() => {
         </tbody>
       </table>
     </div>
-    <footer class="pagination">
+    <footer v-if="data && !error" class="pagination">
       <span
         >{{ data?.totalPages ? page + 1 : 0 }} /
         {{ data?.totalPages ?? 0 }} 페이지</span

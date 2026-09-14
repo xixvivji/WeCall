@@ -21,10 +21,12 @@ const summary = ref<Record<string, number>>(),
   error = ref("");
 const reviewer = computed(() => user.value?.roles.includes("REVIEWER"));
 async function load(reset = false) {
+  if (busy.value) return;
   if (reset) page.value = 0;
   busy.value = true;
   error.value = "";
   rows.value = undefined;
+  summary.value = undefined;
   try {
     const query = new URLSearchParams({
       scope: scope.value,
@@ -54,7 +56,9 @@ onMounted(() => load());
       <p class="muted">사건 현황과 내 담당 작업을 확인합니다.</p>
     </div>
   </div>
-  <p v-if="error" class="error" role="alert">{{ error }}</p>
+  <p v-if="error" class="error" role="alert">
+    {{ error }} <button :disabled="busy" @click="load()">다시 시도</button>
+  </p>
   <section v-if="summary" class="panel">
     <div class="summary-grid">
       <div

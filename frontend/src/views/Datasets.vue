@@ -11,6 +11,8 @@ import {
 const page = ref(0),
   data = ref<Page<Dataset>>(),
   error = ref(""),
+  listError = ref(""),
+  loading = ref(false),
   success = ref(""),
   busy = ref(false),
   asOf = ref(""),
@@ -22,15 +24,25 @@ const files = [
   ["shipments", "출고"],
   ["shipmentAllocations", "출고·입고 연결"],
 ] as const;
+let generation = 0;
 async function load() {
-  error.value = "";
+  const ticket = ++generation;
+  loading.value = true;
+  listError.value = "";
+  data.value = undefined;
   try {
-    data.value = await api("/api/v1/datasets?page=" + page.value + "&size=20");
+    const result = await api<Page<Dataset>>(
+      "/api/v1/datasets?page=" + page.value + "&size=20",
+    );
+    if (ticket === generation) data.value = result;
   } catch (e) {
-    error.value = errorText(e);
+    if (ticket === generation) listError.value = errorText(e);
+  } finally {
+    if (ticket === generation) loading.value = false;
   }
 }
 async function upload() {
+  if (busy.value) return;
   busy.value = true;
   error.value = "";
   success.value = "";
@@ -96,12 +108,19 @@ onMounted(load);
   <section class="panel list-panel">
     <div class="list-caption">
       <strong>등록된 데이터</strong
-      ><span>{{ data?.totalElements ?? 0 }}건</span>
+      ><span v-if="data">{{ data.totalElements }}건</span>
     </div>
-    <div v-if="!data?.items.length" class="empty">
+    <p v-if="listError" class="error" role="alert">
+      {{ listError }}
+      <button :disabled="loading" @click="load">다시 시도</button>
+    </p>
+    <p v-if="loading" class="empty" role="status">
+      데이터를 불러오는 중입니다…
+    </p>
+    <div v-else-if="!listError && data && !data.items.length" class="empty">
       등록된 데이터가 없습니다.
     </div>
-    <div v-else class="table-scroll">
+    <div v-else-if="!listError && data" class="table-scroll">
       <table>
         <thead>
           <tr>
@@ -125,14 +144,14 @@ onMounted(load);
         </tbody>
       </table>
     </div>
-    <footer class="pagination">
+    <footer v-if="data && !listError" class="pagination">
       <span
         >{{ data?.totalPages ? page + 1 : 0 }} /
         {{ data?.totalPages ?? 0 }} 페이지</span
       >
       <div>
         <button
-          :disabled="page === 0"
+          :disabled="page === 0 || loading || busy"
           @click="
             page--;
             load();
@@ -140,7 +159,7 @@ onMounted(load);
         >
           이전</button
         ><button
-          :disabled="!data || page + 1 >= data.totalPages"
+          :disabled="!data || page + 1 >= data.totalPages || loading || busy"
           @click="
             page++;
             load();

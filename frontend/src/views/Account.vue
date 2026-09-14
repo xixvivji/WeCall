@@ -7,6 +7,7 @@ const currentPassword = ref(""),
   busy = ref(false),
   error = ref("");
 async function save() {
+  if (busy.value) return;
   busy.value = true;
   error.value = "";
   try {

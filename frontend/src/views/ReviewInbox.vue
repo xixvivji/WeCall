@@ -23,6 +23,7 @@ const data = ref<Page<Review> & { counts: Record<string, number> }>(),
   error = ref("");
 const reviewer = computed(() => user.value?.roles.includes("REVIEWER"));
 async function load(reset = false) {
+  if (busy.value) return;
   if (!reviewer.value) return;
   if (reset) page.value = 0;
   busy.value = true;
@@ -70,7 +71,9 @@ onMounted(() => load());
     검토 대기함은 검토자만 사용할 수 있습니다.
   </p>
   <template v-else
-    ><p v-if="error" class="error" role="alert">{{ error }}</p>
+    ><p v-if="error" class="error" role="alert">
+      {{ error }} <button :disabled="busy" @click="load()">다시 시도</button>
+    </p>
     <section class="panel">
       <form @submit.prevent="load(true)">
         <fieldset :disabled="busy" class="filters">
