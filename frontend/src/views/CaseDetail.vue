@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, nextTick } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   api,
   downloadAssessment,
@@ -21,21 +21,60 @@ import Tasks from "../components/Tasks.vue";
 import Closure from "../components/Closure.vue";
 import Comparison from "../components/Comparison.vue";
 import Evidence from "../components/Evidence.vue";
-const route = useRoute();
+const route = useRoute(),
+  router = useRouter();
+const tabs = [
+  "overview",
+  "impact",
+  "comparison",
+  "evidence",
+  "tasks",
+  "closure",
+  "history",
+  "report",
+];
+const requestedTab =
+  typeof route.query.tab === "string" && tabs.includes(route.query.tab)
+    ? route.query.tab
+    : "overview";
+const explicitRun = typeof route.query.assessment === "string";
+const linkNotice = ref("");
+function navigate(tabName: string, selectedRun = runId.value) {
+  return router.push({
+    path: route.path,
+    query: { tab: tabName, assessment: selectedRun },
+  });
+}
+async function copyViewLink() {
+  linkNotice.value = "";
+  const href = router.resolve({
+    path: route.path,
+    query: { ...route.query, tab: tab.value, assessment: runId.value },
+  }).href;
+  try {
+    await navigator.clipboard.writeText(
+      new URL(href, window.location.href).href,
+    );
+    linkNotice.value = "현재 탭과 기준 판정의 링크를 복사했습니다.";
+  } catch {
+    linkNotice.value =
+      "링크를 복사하지 못했습니다. 브라우저 주소를 복사해 주세요.";
+  }
+}
 const id = String(route.params.id),
   recall = ref<CaseDetail>(),
   conditions = ref<Condition[]>([]),
   runs = ref<RunRow[]>([]),
   assessment = ref<Assessment>(),
-  runId = ref(""),
+  runId = ref(explicitRun ? String(route.query.assessment) : ""),
   tab = ref(
     useRoute().query.task
       ? "tasks"
       : useRoute().query.evidence
         ? "evidence"
-        : useRoute().query.tab === "closure"
-          ? "closure"
-          : "overview",
+        : route.query.condition
+          ? "overview"
+          : requestedTab,
   ),
   error = ref(""),
   success = ref(""),
@@ -59,7 +98,12 @@ async function load() {
         api<Condition>(`/api/v1/recalls/${id}/conditions/${v.id}`),
       ),
     );
-    if (!runId.value && r[0]) runId.value = r[0].id;
+    if (!explicitRun && !runId.value && r[0]) runId.value = r[0].id;
+    if (runId.value && !r.some((run) => run.id === runId.value)) {
+      throw new Error(
+        "이 사건에서 찾을 수 없는 기준 판정입니다. 판정을 다시 선택하세요.",
+      );
+    }
     if (runId.value) await loadRun();
   } catch (e) {
     error.value = errorText(e);
@@ -117,7 +161,7 @@ async function assess(condition: Condition) {
     });
     runId.value = run.id;
     await load();
-    tab.value = "impact";
+    await navigate("impact", run.id);
     success.value = "판정 결과를 저장했습니다.";
   } catch (e) {
     error.value = errorText(e);
@@ -128,7 +172,7 @@ async function assess(condition: Condition) {
 async function showEvidenceAssessment(id: string) {
   runId.value = id;
   await load();
-  tab.value = "impact";
+  await navigate("impact", id);
 }
 function ruleText(rule: Rule): string {
   if (rule.children)
@@ -174,6 +218,12 @@ onMounted(async () => {
         label(recall.status)
       }}</span>
     </div>
+    <div class="inline">
+      <button @click="copyViewLink">현재 화면 링크 복사</button>
+      <p v-if="linkNotice" role="status" class="small muted">
+        {{ linkNotice }}
+      </p>
+    </div>
     <nav class="tabs" aria-label="사건 업무">
       <button
         v-for="[value, name] in [
@@ -189,7 +239,7 @@ onMounted(async () => {
         :key="value"
         :class="{ active: tab === value }"
         :aria-current="tab === value ? 'page' : undefined"
-        @click="tab = value!"
+        @click="navigate(value!)"
       >
         {{ name }}
       </button>
@@ -276,7 +326,7 @@ onMounted(async () => {
     <template v-else
       ><section v-if="!['comparison', 'history'].includes(tab)" class="panel">
         <label
-          >조회·작업 기준 판정<select v-model="runId" @change="loadRun">
+          >조회·작업 기준 판정<select v-model="runId" @change="navigate(tab)">
             <option value="">판정 선택</option>
             <option v-for="run in runs" :key="run.id" :value="run.id">
               조건 v{{

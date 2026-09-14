@@ -78,8 +78,17 @@ test("report selects stored quantities, recovers failures and prints only the re
   });
   await page.reload();
   await page.getByRole("button", { name: "대응 보고서", exact: true }).click();
+  await page.getByLabel("조회·작업 기준 판정").selectOption(assessment.id);
   const report = page.getByRole("region", { name: "사건 대응 보고서" });
   await expect(report).toContainText(assessment.id);
+  const newer = await post(page, `/api/v1/recalls/${recall.id}/assessments`, { conditionId: condition.id });
+  expect(newer.id).not.toBe(assessment.id);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "대응 보고서", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(report).toContainText(assessment.id);
+
   await expect(report).not.toContainText("Invalid Date");
   await expect(
     report.getByRole("table", { name: "보고서 판정 수량" }),
