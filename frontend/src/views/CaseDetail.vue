@@ -14,6 +14,7 @@ import {
   type Assessment,
   type Rule,
 } from "../api";
+import CaseHistory from "../components/CaseHistory.vue";
 import ConditionForm from "../components/ConditionForm.vue";
 import Tasks from "../components/Tasks.vue";
 import Closure from "../components/Closure.vue";
@@ -31,7 +32,9 @@ const id = String(route.params.id),
       ? "tasks"
       : useRoute().query.evidence
         ? "evidence"
-        : "overview",
+        : useRoute().query.tab === "closure"
+          ? "closure"
+          : "overview",
   ),
   error = ref(""),
   success = ref(""),
@@ -178,6 +181,7 @@ onMounted(async () => {
           ['evidence', '입고 증거'],
           ['tasks', '대응 작업'],
           ['closure', '종료 점검'],
+          ['history', '업무 이력'],
         ]"
         :key="value"
         :class="{ active: tab === value }"
@@ -267,7 +271,7 @@ onMounted(async () => {
         <ConditionForm :case-id="id" @saved="saved" /></section
     ></template>
     <template v-else
-      ><section v-if="tab !== 'comparison'" class="panel">
+      ><section v-if="!['comparison', 'history'].includes(tab)" class="panel">
         <label
           >조회·작업 기준 판정<select v-model="runId" @change="loadRun">
             <option value="">판정 선택</option>
@@ -406,6 +410,11 @@ onMounted(async () => {
           </div>
         </section></template
       >
+      <CaseHistory
+        v-if="tab === 'history'"
+        :case-id="id"
+        @open="tab = $event"
+      />
       <Comparison v-if="tab === 'comparison'" :case-id="id" :runs="runs" />
       <Evidence
         v-if="tab === 'evidence'"

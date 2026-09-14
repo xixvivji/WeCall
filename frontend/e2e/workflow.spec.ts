@@ -358,6 +358,30 @@ test("real backend workflow and role boundaries", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "최종 검토 후 사건 종료" }),
   ).toBeDisabled();
+  await page.getByRole("button", { name: "업무 이력", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "사건 업무 이력" }),
+  ).toBeVisible();
+  for (const name of [
+    "조건 승인",
+    "입고 증거 승인",
+    "입고 증거 반려",
+    "증빙 승인",
+    "작업 완료",
+  ]) {
+    await expect(
+      page.locator(".history-entry strong").filter({ hasText: name }),
+    ).toHaveCount(1 + (name === "조건 승인" ? 1 : 0));
+  }
+  await page.getByLabel("이력 유형", { exact: true }).selectOption("PROOF");
+  await page.getByRole("button", { name: "이력 조회", exact: true }).click();
+  await expect(page.locator(".history-entry")).toHaveCount(2);
+  await page
+    .locator(".history-entry")
+    .filter({ has: page.getByText("증빙 승인", { exact: true }) })
+    .getByRole("link", { name: "관련 상세 열기" })
+    .click();
+  await expect(page.locator(".proof.review-highlight")).toBeVisible();
   await page.getByRole("link", { name: "← 사건 목록" }).click();
   await page.getByLabel("사건명 검색").fill(title);
   await page.getByRole("button", { name: "검색", exact: true }).click();
