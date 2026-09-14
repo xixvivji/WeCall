@@ -55,6 +55,7 @@ function setReview(id: string, event: Event) {
   else reviews.value[id] = { status, reason: reviews.value[id]?.reason || "" };
 }
 async function save() {
+  if (busy.value) return;
   error.value = "";
   busy.value = true;
   try {

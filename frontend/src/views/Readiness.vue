@@ -42,10 +42,12 @@ const summary = ref<Summary>(),
   busy = ref(false),
   error = ref("");
 async function load(reset = false) {
+  if (busy.value) return;
   if (reset) page.value = 0;
   busy.value = true;
   error.value = "";
   rows.value = undefined;
+  summary.value = undefined;
   try {
     const [s, r] = await Promise.all([
       api<Summary>(`/api/v1/datasets/${id}/readiness`),
@@ -73,7 +75,9 @@ onMounted(() => load());
       <p v-if="summary" class="muted">기준 시각 {{ dateText(summary.asOf) }}</p>
     </div>
   </div>
-  <p v-if="error" class="error" role="alert">{{ error }}</p>
+  <p v-if="error" class="error" role="alert">
+    {{ error }} <button :disabled="busy" @click="load()">다시 시도</button>
+  </p>
   <p v-if="busy" role="status">점검 결과를 불러오는 중…</p>
   <Provenance v-if="summary" :dataset-id="id" />
   <template v-if="summary"

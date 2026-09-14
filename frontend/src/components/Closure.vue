@@ -21,10 +21,14 @@ const check = ref<Check>(),
   >([]),
   error = ref(""),
   busy = ref(false),
+  loading = ref(false),
   confirmed = ref(false),
   note = ref(""),
   reviewer = computed(() => user.value?.roles.includes("REVIEWER"));
+let generation = 0;
 async function load() {
+  const ticket = ++generation;
+  loading.value = true;
   error.value = "";
   check.value = undefined;
   confirmed.value = false;
@@ -38,13 +42,17 @@ async function load() {
         `/api/v1/recalls/${props.recall.id}/lifecycle`,
       ),
     ]);
+    if (ticket !== generation) return;
     check.value = c;
     history.value = h.history;
   } catch (e) {
-    error.value = errorText(e);
+    if (ticket === generation) error.value = errorText(e);
+  } finally {
+    if (ticket === generation) loading.value = false;
   }
 }
 async function save() {
+  if (busy.value || loading.value || !check.value) return;
   busy.value = true;
   error.value = "";
   try {
@@ -80,13 +88,14 @@ watch(() => props.assessmentId, load);
   <section class="panel">
     <div class="section-heading">
       <h2>사건 종료 점검</h2>
-      <button :disabled="busy" @click="load">다시 점검</button>
+      <button :disabled="busy || loading" @click="load">다시 점검</button>
     </div>
     <p class="note">
       선택한 판정과 현재 대응 이력을 기준으로 점검합니다. 대상 범위의 실제 대응
       여부는 검토자가 확인해야 합니다.
     </p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="loading" role="status">종료 조건을 점검하는 중입니다…</p>
     <template v-if="check"
       ><p v-if="check.ready" class="success">
         시스템 점검을 통과했습니다. 대응 범위를 최종 확인하세요.

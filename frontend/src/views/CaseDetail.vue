@@ -89,6 +89,7 @@ async function exportResult(type: "inventory" | "shipments") {
   }
 }
 async function approve(condition: Condition) {
+  if (busy.value) return;
   busy.value = true;
   error.value = "";
   try {
@@ -102,6 +103,7 @@ async function approve(condition: Condition) {
   }
 }
 async function assess(condition: Condition) {
+  if (busy.value) return;
   busy.value = true;
   error.value = "";
   try {
