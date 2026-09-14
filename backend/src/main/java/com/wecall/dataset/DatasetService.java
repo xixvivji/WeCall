@@ -49,17 +49,19 @@ public class DatasetService {
         result.put("files",files);result.put("derivation",derived.isEmpty()?null:derived.getFirst());
         return result;
     }
-    private static final Map<String, String> HEADERS = Map.of(
-        "products", "product_id,name,manufacturer,pack_size,unit",
-        "receipts", "receipt_id,product_id,lot_number,expiry_date,received_quantity,received_at",
-        "inventory", "inventory_id,receipt_id,warehouse,quantity,hold_status",
-        "shipments", "shipment_id,order_id,product_id,quantity,shipped_at",
-        "shipment_allocations", "allocation_id,shipment_id,receipt_id,quantity");
-    private static final List<String> FILES = List.of("products", "receipts", "inventory", "shipments", "shipment_allocations");
+    private static final List<String> FILES = CsvSchema.TEMPLATES.stream().map(CsvSchema.Template::type).toList();
     public record ImportError(String file, long row, String field, String message) {}
     public static class InvalidDataset extends RuntimeException {
         public final List<ImportError> errors;
-        public InvalidDataset(List<ImportError> errors) { super("CSV validation failed"); this.errors = errors; }
+        public final long errorCount;
+        public InvalidDataset(List<ImportError> errors) {
+            super("CSV validation failed"); this.errors = List.copyOf(errors);
+            this.errorCount = errors instanceof ErrorList list ? list.total : errors.size();
+        }
+    }
+    private static class ErrorList extends ArrayList<ImportError> {
+        long total;
+        @Override public boolean add(ImportError error) {total++;return size()<200 && super.add(error);}
     }
     private record Row(String file, long line, Map<String, String> values) {
         String get(String key) { return values.get(key); }
@@ -71,7 +73,7 @@ public class DatasetService {
     }
     private Map<String, Row> parse(String file, MultipartFile upload, List<ImportError> errors) {
         Map<String, Row> rows = new LinkedHashMap<>();
-        var headers = List.of(HEADERS.get(file).split(","));
+        var headers = CsvSchema.find(file).columns().stream().map(CsvSchema.Column::name).toList();
         var decoder = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT);
         try (var reader = new BufferedReader(new InputStreamReader(upload.getInputStream(), decoder))) {
             reader.mark(1);
@@ -79,7 +81,7 @@ public class DatasetService {
             try (var parser = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true)
                     .setIgnoreEmptyLines(false).get().parse(reader)) {
                 if (!parser.getHeaderNames().equals(headers)) {
-                    errors.add(new ImportError(file + ".csv", 1, "header", "헤더와 순서가 지정 양식과 다릅니다"));
+                    errors.add(new ImportError(file + ".csv", 1, "header", "헤더와 순서가 지정 양식과 다릅니다. 필요한 헤더: " + CsvSchema.find(file).header()));
                     return rows;
                 }
                 for (var record : parser) {
@@ -115,17 +117,17 @@ public class DatasetService {
                     }
                     if (file.equals("products") && !r.get("unit").equals("EA")) error(errors, r, "unit", "현재 EA만 지원");
                     if (file.equals("inventory") && !Set.of("NONE", "HELD").contains(r.get("hold_status"))) error(errors,r,"hold_status","NONE 또는 HELD 필요");
-                    if (rows.putIfAbsent(r.id(), r) != null) error(errors, r, headers.getFirst(), "중복 ID");
+                    if (rows.putIfAbsent(r.id(), r) != null) error(errors, r, headers.getFirst(), "중복 ID: " + r.id());
                 }
             }
         } catch (IOException | UncheckedIOException | IllegalArgumentException e) {
-            errors.add(new ImportError(file + ".csv", 0, "", "UTF-8 CSV 파싱 실패"));
+            errors.add(new ImportError(file + ".csv", 0, "", "UTF-8 CSV 파싱 실패. UTF-8 인코딩, 쉼표 구분과 큰따옴표 쌍을 확인하세요"));
         }
         return rows;
     }
     private void references(Map<String, Map<String, Row>> data, String from, String field, String to, List<ImportError> errors) {
         for (Row r : data.get(from).values())
-            if (!data.get(to).containsKey(r.get(field))) error(errors,r,field,"참조 ID가 없습니다");
+            if (!data.get(to).containsKey(r.get(field))) error(errors,r,field,"참조 ID '" + r.get(field) + "'가 " + to + ".csv에 없습니다");
     }
     private void reject(List<ImportError> errors) { if (!errors.isEmpty()) throw new InvalidDataset(errors); }
 
@@ -138,7 +140,7 @@ public class DatasetService {
 
         if(uploads.values().stream().anyMatch(f->f.getSize()>5L*1024*1024)||uploads.values().stream().mapToLong(MultipartFile::getSize).sum()>26L*1024*1024)
             throw new com.wecall.recall.RecallService.Failure(org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE,"CSV 파일당 5 MiB, 전체 26 MiB 제한입니다");
-        List<ImportError> errors = new ArrayList<>();
+        List<ImportError> errors = new ErrorList();
         Map<String, Map<String, Row>> data = new LinkedHashMap<>();
         for (String file : FILES) data.put(file, parse(file, uploads.get(file), errors));
         reject(errors);

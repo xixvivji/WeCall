@@ -35,6 +35,58 @@ class DatasetImportTests {
         return req;
     }
     void empty() { assertThat(jdbc.queryForObject("SELECT count(*) FROM dataset",Long.class)).isZero(); }
+    @Test void downloadedTemplatesMatchSampleHeadersAndImportWithoutExampleRows() throws Exception {
+        var zipBytes=mvc.perform(get("/api/v1/datasets/templates.zip")).andExpect(status().isOk())
+            .andExpect(header().string("Content-Disposition","attachment; filename=\"wecall-csv-templates.zip\""))
+            .andReturn().getResponse().getContentAsByteArray();
+        Map<String,byte[]> entries=new HashMap<>();
+        try(var zip=new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(zipBytes),java.nio.charset.StandardCharsets.UTF_8)) {
+            java.util.zip.ZipEntry entry;while((entry=zip.getNextEntry())!=null)entries.put(entry.getName(),zip.readAllBytes());
+        }
+        assertThat(entries).hasSize(6);assertThat(entries).containsKey("작성안내.txt");
+        var req=multipart("/api/v1/datasets");req.with(csrf());req.param("asOf","2026-09-09T18:00:00+09:00");
+        for(var file:FILES.entrySet()) {
+            var bytes=mvc.perform(get("/api/v1/datasets/templates/"+file.getValue()+".csv")).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+            assertThat(bytes).isEqualTo(entries.get(file.getValue()+".csv"));
+            String expected=Files.readAllLines(Path.of("../samples/recall-001/"+file.getValue()+".csv")).getFirst();
+            assertThat(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("\ufeff"+expected+"\r\n");
+            req.file(new MockMultipartFile(file.getKey(),file.getValue()+".csv","text/csv",bytes));
+        }
+        mvc.perform(req).andExpect(status().isCreated()).andExpect(jsonPath("$.counts.products").value(0)).andExpect(jsonPath("$.unlinkedShipmentQuantity").value(0));
+    }
+    @Test void templateMetadataMatchesFieldsAndEnforcesReadAuthentication() throws Exception {
+        mvc.perform(get("/api/v1/datasets/templates")).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(5))
+            .andExpect(jsonPath("$[1].columns[2].name").value("lot_number")).andExpect(jsonPath("$[1].columns[2].required").value(false))
+            .andExpect(jsonPath("$[4].field").value("shipmentAllocations"));
+        mvc.perform(get("/api/v1/datasets/templates/products.csv").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("operator").roles("OPERATOR"))).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/datasets/templates.zip").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/datasets/templates/unknown.csv")).andExpect(status().isNotFound());
+        empty();
+    }
+    @Test void capsDetailedErrorsAndReportsTotalWithoutPartialWrites() throws Exception {
+        StringBuilder rows=new StringBuilder("inventory_id,receipt_id,warehouse,quantity,hold_status\n");
+        for(int i=0;i<250;i++)rows.append("BAD").append(i).append(",R1,WH1,-1,NONE\n");
+        String sample=Files.readString(Path.of("../samples/recall-001/inventory.csv"));
+        mvc.perform(request("inventory",sample,rows.toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors.length()").value(200)).andExpect(jsonPath("$.errorCount").value(250))
+            .andExpect(jsonPath("$.truncated").value(true)).andExpect(jsonPath("$.errors[0].row").value(2))
+            .andExpect(jsonPath("$.errors[199].row").value(201));empty();
+    }
+    @Test void csvRecordNumbersIncludeHeaderButNotEmbeddedNewlines() throws Exception {
+        String sample=Files.readString(Path.of("../samples/recall-001/products.csv"));
+        String csv="product_id,name,manufacturer,pack_size,unit\nP1,\"쉼표, 포함\n두 줄 상품\",제조사,100g,EA\nP2,다른 상품,제조사,100g,BOX\n";
+        mvc.perform(request("products",sample,csv)).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].row").value(3)).andExpect(jsonPath("$.errors[0].field").value("unit"));empty();
+    }
+    @Test void headerAndFileParsingErrorsAreActionableAndDoNotClaimRowZero() throws Exception {
+        mvc.perform(request("products","product_id,name","name,product_id")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].row").value(1)).andExpect(jsonPath("$.errors[0].field").value("header"))
+            .andExpect(jsonPath("$.errors[0].message").value(org.hamcrest.Matchers.containsString("product_id,name,manufacturer")));empty();
+        String sample=Files.readString(Path.of("../samples/recall-001/products.csv"));
+        mvc.perform(request("products",sample,"product_id,name,manufacturer,pack_size,unit\nP1,\"닫히지 않은 문자열"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].row").value(0))
+            .andExpect(jsonPath("$.errors[0].message").value(org.hamcrest.Matchers.containsString("큰따옴표")));empty();
+    }
     @Test void csvSizeLimitRemainsFiveMiBAfterAttachmentSupport() throws Exception {
         var req=multipart("/api/v1/datasets");req.param("asOf","2026-09-09T18:00:00+09:00");req.with(csrf());
         for(var entry:FILES.entrySet())req.file(new MockMultipartFile(entry.getKey(),entry.getValue()+".csv","text/csv",entry.getKey().equals("products")?new byte[5*1024*1024+1]:Files.readAllBytes(Path.of("../samples/recall-001/"+entry.getValue()+".csv"))));

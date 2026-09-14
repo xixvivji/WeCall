@@ -6,10 +6,18 @@ export interface User {
 export const user = ref<User | null>(null);
 export const sessionNotice = ref("");
 let csrf: { token: string; headerName: string } | null = null;
+export interface ValidationIssue {
+  file?: string;
+  row?: number;
+  field?: string;
+  message: string;
+}
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public issues: ValidationIssue[] = [],
+    public issueCount: number = issues.length,
   ) {
     super(message);
   }
@@ -82,6 +90,8 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
         data?.message ||
         messages[data?.code] ||
         "요청 처리에 실패했습니다.",
+      data?.errors || [],
+      data?.errorCount ?? data?.errors?.length ?? 0,
     );
   }
   return data as T;
@@ -315,5 +325,32 @@ export async function downloadAttachment(
   document.body.appendChild(a);
   a.click();
   a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function downloadCsvTemplate(type?: string) {
+  const path = type
+    ? `/api/v1/datasets/templates/${encodeURIComponent(type)}.csv`
+    : "/api/v1/datasets/templates.zip";
+  const response = await fetch(path, { credentials: "same-origin" });
+  if (!response.ok) {
+    if (response.status === 401) {
+      user.value = null;
+      csrf = null;
+    }
+    throw new ApiError(
+      response.status,
+      response.status === 401
+        ? "로그인이 필요합니다."
+        : "CSV 양식을 내려받지 못했습니다. 다시 시도하세요.",
+    );
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = type ? type + ".csv" : "wecall-csv-templates.zip";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
