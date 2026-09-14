@@ -16,8 +16,8 @@ import java.util.*;
 
 @Service
 public class AttachmentService {
-    private final JdbcTemplate jdbc;private final AttachmentStorage storage;
-    public AttachmentService(JdbcTemplate jdbc,AttachmentStorage storage){this.jdbc=jdbc;this.storage=storage;}
+    private final JdbcTemplate jdbc;private final AttachmentStorage storage;private final MalwareScanner scanner;
+    public AttachmentService(JdbcTemplate jdbc,AttachmentStorage storage,MalwareScanner scanner){this.jdbc=jdbc;this.storage=storage;this.scanner=scanner;}
     public record ValidFile(String filename,String mediaType,byte[] bytes,String sha256) {}
     private RecallService.Failure fail(HttpStatus status,String message){return new RecallService.Failure(status,message);}
     public static String hash(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
@@ -58,17 +58,18 @@ public class AttachmentService {
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void save(UUID caseId,UUID evidenceId,UUID taskId,UUID proofId,List<ValidFile> files) {
         for(var file:files) {
+            var scan=scanner.scan(file.bytes());
             UUID id=UUID.randomUUID();
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){public void afterCompletion(int status){if(status!=STATUS_COMMITTED)try{storage.delete(id);}catch(IOException e){org.slf4j.LoggerFactory.getLogger(AttachmentService.class).error("Attachment rollback cleanup failed for {}",id);}}});
             try{storage.write(id,file.bytes());}catch(IOException e){throw fail(HttpStatus.SERVICE_UNAVAILABLE,"파일 저장에 실패했습니다. 다시 시도하세요");}
-            jdbc.update("INSERT INTO evidence_attachment(id,case_id,evidence_id,task_id,proof_id,filename,media_type,byte_size,sha256,uploaded_by) VALUES (?,?,?,?,?,?,?,?,?,?)",id,caseId,evidenceId,taskId,proofId,file.filename(),file.mediaType(),file.bytes().length,file.sha256(),CurrentActor.username());
+            jdbc.update("INSERT INTO evidence_attachment(id,case_id,evidence_id,task_id,proof_id,filename,media_type,byte_size,sha256,uploaded_by,scan_status,scan_engine,scanned_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",id,caseId,evidenceId,taskId,proofId,file.filename(),file.mediaType(),file.bytes().length,file.sha256(),CurrentActor.username(),scan.status(),scan.engine(),scan.scannedAt());
             event(id,"UPLOADED");
         }
     }
     private void event(UUID id,String type){jdbc.update("INSERT INTO attachment_event(id,attachment_id,event_type,actor) VALUES (?,?,?,?)",UUID.randomUUID(),id,type,CurrentActor.username());}
     public List<Map<String,Object>> list(UUID caseId,UUID evidenceId,UUID proofId) {
         if((evidenceId==null)==(proofId==null))throw fail(HttpStatus.BAD_REQUEST,"입고 증거 또는 작업 증빙 ID 하나를 지정하세요");
-        return jdbc.queryForList("SELECT id,filename,media_type AS \"mediaType\",byte_size AS \"byteSize\",sha256,uploaded_by AS \"uploadedBy\",created_at AS \"createdAt\" FROM evidence_attachment WHERE case_id=? AND "+(evidenceId!=null?"evidence_id":"proof_id")+"=? ORDER BY created_at,id",caseId,evidenceId!=null?evidenceId:proofId);
+        return jdbc.queryForList("SELECT id,filename,media_type AS \"mediaType\",byte_size AS \"byteSize\",scan_status AS \"scanStatus\",scan_engine AS \"scanEngine\",scanned_at AS \"scannedAt\",sha256,uploaded_by AS \"uploadedBy\",created_at AS \"createdAt\" FROM evidence_attachment WHERE case_id=? AND "+(evidenceId!=null?"evidence_id":"proof_id")+"=? ORDER BY created_at,id",caseId,evidenceId!=null?evidenceId:proofId);
     }
     public record Download(String filename,String mediaType,byte[] bytes) {}
     @Transactional
@@ -78,6 +79,7 @@ public class AttachmentService {
         var row=rows.getFirst();byte[] bytes;
         try{bytes=storage.read(id);}catch(IOException e){throw fail(HttpStatus.SERVICE_UNAVAILABLE,"첨부 파일을 읽을 수 없습니다. 관리자에게 확인하세요");}
         if(bytes.length!=((Number)row.get("byte_size")).longValue()||!hash(bytes).equals(row.get("sha256")))throw fail(HttpStatus.SERVICE_UNAVAILABLE,"첨부 파일 무결성 확인에 실패했습니다");
+        scanner.scan(bytes);
         event(id,"DOWNLOAD_REQUESTED");
         return new Download((String)row.get("filename"),(String)row.get("media_type"),bytes);
     }

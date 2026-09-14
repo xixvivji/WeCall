@@ -13,6 +13,9 @@ interface FileRow {
   sha256: string;
   uploadedBy: string;
   createdAt: string;
+  scanStatus?: "CLEAN" | "NOT_SCANNED";
+  scanEngine?: string | null;
+  scannedAt?: string | null;
 }
 const rows = ref<FileRow[]>(),
   error = ref(""),
@@ -54,6 +57,17 @@ onMounted(load);
       <p class="muted">
         {{ row.byteSize.toLocaleString() }} bytes · {{ row.uploadedBy }} ·
         {{ dateText(row.createdAt) }}
+      </p>
+      <p class="small muted">
+        {{
+          row.scanStatus === "CLEAN"
+            ? "업로드 시 위협 미탐지"
+            : "악성 파일 미검사"
+        }}
+        <template v-if="row.scanStatus === 'CLEAN'">
+          · {{ row.scanEngine }} ·
+          {{ dateText(row.scannedAt || null) }}</template
+        >
       </p>
       <p class="hash">SHA-256 {{ row.sha256 }}</p>
     </div>

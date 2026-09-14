@@ -1,6 +1,6 @@
 # 구현 ERD와 데이터 사전
 
-기준: 2026-09-13, 파일 첨부 V10 반영. [Flyway V1~V10](../../backend/src/main/resources/db/migration/)의 실제 20개 테이블을 기준으로 한다. 단일 기업 모델이며 아래 선은 DB FK 관계다. 복합 FK의 정확한 컬럼은 데이터 사전·SQL을 따른다.
+기준: 2026-09-14, 첨부 검사 V11 반영. [Flyway V1~V11](../../backend/src/main/resources/db/migration/)의 실제 20개 테이블을 기준으로 한다. 단일 기업 모델이며 아래 선은 DB FK 관계다. 복합 FK의 정확한 컬럼은 데이터 사전·SQL을 따른다.
 
 ## 입력 데이터
 
@@ -100,3 +100,7 @@ erDiagram
 | attachment_event | id UUID PK; attachment_id FK; event_type, actor, created_at | UPLOADED/DOWNLOAD_REQUESTED; 사용자 문자열은 FK 아님 |
 
 증거에 (id,case_id), 작업 증빙에 (id,task_id) 유일키를 추가해 첨부의 사건·작업 경계를 DB에서도 검증한다. 원본 바이트는 DB 외부에 있으며 커밋 완료와 파일 무결성을 애플리케이션이 확인한다. 별도 첨부 삭제·교체 API는 없다.
+
+## V11 첨부 검사 메타데이터
+
+evidence_attachment에 scan_status(NOT_SCANNED/CLEAN), scan_engine, scanned_at을 추가한다. CLEAN은 업로드 당시 엔진과 검사 시각이 있어야 하며, 과거 파일은 NOT_SCANNED로 이관한다. 새 테이블은 없다. 다운로드는 설정된 현재 엔진으로 다시 검사하며 업로드 메타데이터를 덮어쓰지 않는다.

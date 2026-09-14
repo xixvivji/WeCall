@@ -30,6 +30,11 @@ management:
 wecall:
   attachments:
     directory: ${WECALL_ATTACHMENT_DIR:${user.home}/.wecall/attachments}
+    scan:
+      mode: ${WECALL_ATTACHMENT_SCAN_MODE:disabled}
+      host: ${WECALL_CLAMD_HOST:127.0.0.1}
+      port: ${WECALL_CLAMD_PORT:3310}
+      timeout-ms: ${WECALL_CLAMD_TIMEOUT_MS:10000}
   ai:
     base-url: ${WECALL_AI_BASE_URL:http://127.0.0.1:8000}
     service-token: ${WECALL_AI_SERVICE_TOKEN:}

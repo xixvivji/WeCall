@@ -1,6 +1,6 @@
 # 증거 파일 첨부 API와 로컬 운영
 
-상태: 로컬 구현. PDF/PNG/JPEG를 새 입고 증거·작업 증빙과 함께 생성한다. 합성 자료로 검증했으며 운영 보관 정책·악성 파일 검사·OCR은 미구현이다.
+상태: 로컬 구현. PDF/PNG/JPEG를 새 입고 증거·작업 증빙과 함께 생성한다. 합성 자료로 검증했으며 운영 보관 정책·실제 검사 엔진 배치·OCR은 별도다. Clamd 검사 연동은 [검사 계약](attachment-scanning.md)을 따른다.
 
 ## 등록 계약
 
@@ -25,7 +25,7 @@
 
 ## 목록과 다운로드
 
-- `GET /api/v1/recalls/{caseId}/attachments?evidenceId={id}` 또는 `?proofId={id}`: 둘 중 하나만 지정. id, filename, mediaType, byteSize, sha256, uploadedBy, createdAt 반환. 해당 사건·대상의 첨부가 없으면 빈 배열이다.
+- `GET /api/v1/recalls/{caseId}/attachments?evidenceId={id}` 또는 `?proofId={id}`: 둘 중 하나만 지정. id, filename, mediaType, byteSize, sha256, uploadedBy, createdAt, scanStatus, scanEngine, scannedAt 반환. 해당 사건·대상의 첨부가 없으면 빈 배열이다.
 - `GET /api/v1/recalls/{caseId}/attachments/{id}/download`: 두 역할 모두 로그인 후 같은 기업 조회 정책으로 사용한다. 다른 사건 ID 또는 없는 파일 ID는 404, 미인증은 401이다.
 - 읽은 파일 크기·SHA-256을 DB 메타데이터와 다시 비교한다. 누락·읽기 실패·무결성 불일치는 503으로 반환한다. 저장 경로나 파일 내용을 오류에 포함하지 않는다.
 - Content-Disposition: attachment, Cache-Control: no-store, X-Content-Type-Options: nosniff, CSP sandbox를 사용한다. 다운로드 요청 이력은 파일 확인 후 응답 전 기록한다. 클라이언트가 저장까지 완료했다는 증거는 아니다.
@@ -52,4 +52,4 @@ python3 scripts/cleanup_attachment_orphans.py --delete --confirm-all-backends-st
 
 삭제 모드는 로컬 8080 포트가 열려 있으면 거부한다. 포트를 바꿨다면 `--backend-port`를 맞춘다. DB 조회 실패 시 삭제하지 않는다. DB가 참조하지 않고 수정된 지 24시간 이상 된 UUID.blob/UUID.part 일반 파일만 후보이며, 링크·기타 파일명·신규 파일·연결 파일은 보존한다. 운영 삭제·보관 만료 기능을 대신하지 않는다.
 
-업무 DB와 첨부 디렉터리는 함께 백업·복원해야 한다. 복원 일관성·암호화·저장소 가용성·악성 파일 검사 및 운영 보관 기간은 아직 별도 작업이다. [파일 관리 정책](file-data-policy.md)
+업무 DB와 첨부 디렉터리는 함께 백업·복원해야 한다. 복원 일관성·암호화·저장소 가용성·실제 악성 파일 검사 엔진 배치 및 운영 보관 기간은 아직 별도 작업이다. [파일 관리 정책](file-data-policy.md)

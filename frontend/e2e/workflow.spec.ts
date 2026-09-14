@@ -183,6 +183,7 @@ test("real backend workflow and role boundaries", async ({ page }) => {
   }
   await proposeEvidence("39");
   await openFromInbox("EVIDENCE");
+  await expect(page.getByText("악성 파일 미검사", { exact: true })).toBeVisible();
   const attachmentDownload = page.waitForEvent("download");
   await page
     .getByRole("button", {

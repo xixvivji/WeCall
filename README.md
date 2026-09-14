@@ -123,7 +123,7 @@ API 키와 비밀번호는 Git에 올리지 않습니다. `.env` 파일은 Git�
 새 CSV 등록은 파일명·SHA-256·바이트 크기·행수·등록자를 기록합니다. 데이터 준비 상태 화면에서 출처를 확인하고, 증거 보완 버전은 기준 데이터와 승인 증거를 따라갈 수 있습니다. 원본 파일 자체 보관은 아직 제공하지 않습니다.
 
 
-새 입고 증거·작업 증빙에 PDF/PNG/JPEG 파일을 최대 5개(파일당 10 MiB) 첨부할 수 있습니다. 기본 저장 위치는 `~/.wecall/attachments`이며 `WECALL_ATTACHMENT_DIR`로 변경합니다. 인증 후 다운로드하며 원본 크기·해시를 확인합니다. OCR·미리보기·악성 파일 검사는 제공하지 않습니다. [첨부 API와 로컬 복구 절차](docs/design/attachments-api.md)
+새 입고 증거·작업 증빙에 PDF/PNG/JPEG 파일을 최대 5개(파일당 10 MiB) 첨부할 수 있습니다. 기본 저장 위치는 `~/.wecall/attachments`이며 `WECALL_ATTACHMENT_DIR`로 변경합니다. 인증 후 다운로드하며 원본 크기·해시를 확인합니다. OCR·미리보기는 제공하지 않습니다. Clamd 검사 어댑터를 추가했으며 기본 합성 개발 모드는 미검사입니다. 실제 엔진은 별도로 구성합니다. [검사 설정](docs/design/attachment-scanning.md) [첨부 API와 로컬 복구 절차](docs/design/attachments-api.md)
 
 ## 자동 검증과 업무 검증 기록
 
@@ -134,3 +134,5 @@ API 키와 비밀번호는 Git에 올리지 않습니다. `.env` 파일은 Git�
 데이터 관리에서 빈 CSV 양식 5종 ZIP과 항목별 작성 안내를 제공합니다. 등록 오류는 파일·행·항목별 표에서 확인하고 수정할 수 있습니다. [CSV 작성·수정 안내](docs/validation/csv-authoring-guide.md)
 
 - [사건별 대응 결과 보고서·인쇄 안내](docs/design/case-report-api.md)
+
+- [백엔드 MVP 인수·프론트/AI 후속 작업](docs/validation/backend-handoff.md)
