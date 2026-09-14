@@ -58,6 +58,44 @@ class RecallWorkflowTests {
     JsonNode run(String conditionId,int status) throws Exception {
         return postJson("/api/v1/recalls/"+caseId+"/assessments",Map.of("conditionId",conditionId),status);
     }
+    @Test void caseReportPreservesSelectedAssessmentAndSeparatesCurrentTasksAndProofRounds() throws Exception {
+        String conditionId=createCondition(condition());approve(conditionId);
+        String selected=run(conditionId,201).get("id").asText();
+        String later=run(conditionId,201).get("id").asText();
+        UUID task=UUID.randomUUID();
+        jdbc.update("INSERT INTO response_task(id,case_id,assessment_id,task_type,target_type,title,instructions,status,review_round) VALUES (?,?,?,'SALES_HOLD','CASE','보고서 작업','지시','IN_PROGRESS',2)",task,UUID.fromString(caseId),UUID.fromString(later));
+        jdbc.update("INSERT INTO response_task_proof(id,task_id,review_round,evidence_text,sha256,submitted_by,status,reviewed_by,review_note,reviewed_at) VALUES (?,?,1,'증빙 원문 제외',?,'실행자','ACCEPTED','검토자','이전 회차 승인',now())",UUID.randomUUID(),task,"a".repeat(64));
+        jdbc.update("INSERT INTO response_task_proof(id,task_id,review_round,evidence_text,sha256,submitted_by) VALUES (?,?,2,'새 증빙',?,'실행자')",UUID.randomUUID(),task,"b".repeat(64));
+        var response=mvc.perform(get("/api/v1/recalls/"+caseId+"/report").param("assessmentId",selected))
+            .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andReturn().getResponse();
+        var report=json.readTree(response.getContentAsByteArray());
+        assertThat(report.at("/assessment/id").asText()).isEqualTo(selected);
+        assertThat(report.at("/assessment/inventoryTotals/target").asInt()).isEqualTo(110);
+        assertThat(report.at("/assessment/shipmentTotals/needsReview").asInt()).isEqualTo(20);
+        assertThat(report.at("/condition/id").asText()).isEqualTo(conditionId);
+        assertThat(report.at("/tasks/0/assessmentId").asText()).isEqualTo(later);
+        assertThat(report.at("/proofs/0/reviewRound").asInt()).isEqualTo(1);
+        assertThat(report.at("/proofs/0/currentRound").asInt()).isEqualTo(2);
+        assertThat(report.at("/proofs/1/status").asText()).isEqualTo("PENDING");
+        assertThat(report.get("generatedAt").asText()).isNotBlank();
+        assertThat(report.toString()).doesNotContain("증빙 원문 제외","새 증빙");
+        assertThat(report.get("blockers").toString()).contains("INCOMPLETE_TASKS","PENDING_TASK_PROOFS");
+        assertThat(report.get("warnings").toString()).contains("OTHER_ASSESSMENT_TASKS");
+        jdbc.update("UPDATE recall_case SET status='CLOSED',closed_at=now() WHERE id=?",UUID.fromString(caseId));
+        mvc.perform(get("/api/v1/recalls/"+caseId+"/report").param("assessmentId",selected)).andExpect(status().isOk()).andExpect(jsonPath("$.case.status").value("CLOSED"));
+    }
+    @Test void caseReportSupportsNoAssessmentAndValidatesCaseScopeAndRoles() throws Exception {
+        String path="/api/v1/recalls/"+caseId+"/report";
+        mvc.perform(get(path)).andExpect(status().isOk()).andExpect(jsonPath("$.assessment").isEmpty()).andExpect(jsonPath("$.tasks").isEmpty());
+        mvc.perform(get(path).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("operator").roles("OPERATOR"))).andExpect(status().isOk());
+        mvc.perform(get(path).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous())).andExpect(status().isUnauthorized());
+        mvc.perform(get(path).param("assessmentId","bad")).andExpect(status().isBadRequest());
+        mvc.perform(get(path).param("assessmentId",UUID.randomUUID().toString())).andExpect(status().isNotFound());
+        String conditionId=createCondition(condition());approve(conditionId);String selected=run(conditionId,201).get("id").asText();
+        var other=postJson("/api/v1/recalls",Map.of("title","다른 사건","sourceType","INTERNAL","sourceText","합성"),201).get("id").asText();
+        mvc.perform(get("/api/v1/recalls/"+other+"/report").param("assessmentId",selected)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/recalls/"+UUID.randomUUID()+"/report")).andExpect(status().isNotFound());
+    }
     @Test void csvExportPreservesSelectedRunAndNeutralizesSpreadsheetFormulas() throws Exception {
         jdbc.update("UPDATE inventory SET warehouse=? WHERE dataset_id=?", "=SUM(1,2)\n창고",datasetId);
         String conditionId=createCondition(condition());approve(conditionId);
