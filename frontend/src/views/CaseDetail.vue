@@ -67,7 +67,8 @@ async function load() {
 }
 async function loadRun() {
   const generation = ++runGeneration;
-  assessment.value = undefined;
+  // Stored assessments are immutable; a same-run refresh must not reset child forms.
+  if (assessment.value?.id !== runId.value) assessment.value = undefined;
   try {
     if (runId.value) {
       const result = await api<Assessment>(

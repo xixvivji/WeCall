@@ -162,9 +162,10 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     readFileSync(resolve(sample, "evidence-request.json"), "utf8"),
   );
   async function proposeEvidence(amount: string) {
-    await page
-      .getByRole("button", { name: "입고 증거 등록", exact: true })
-      .click();
+    if (!(await page.getByLabel("보완할 입고", { exact: true }).isVisible()))
+      await page
+        .getByRole("button", { name: "입고 증거 등록", exact: true })
+        .click();
     await page.getByLabel("보완할 입고", { exact: true }).selectOption("R4");
     await page.getByLabel("입고 증거 원문").fill(evidence.documentText);
     await page.getByLabel("증거 근거 인용").fill(evidence.sourceQuote);
@@ -183,7 +184,9 @@ test("real backend workflow and role boundaries", async ({ page }) => {
   }
   await proposeEvidence("39");
   await openFromInbox("EVIDENCE");
-  await expect(page.getByText("악성 파일 미검사", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("악성 파일 미검사", { exact: true }),
+  ).toBeVisible();
   const attachmentDownload = page.waitForEvent("download");
   await page
     .getByRole("button", {
@@ -217,10 +220,37 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     page.getByRole("button", { name: "증거 승인 및 재판정" }),
   ).toBeDisabled();
   await page.getByLabel("입고 증거 검토 사유").fill("입고 수량 불일치 확인");
+  // Hold the parent refresh so an open form overlaps the same-run reload.
+  let releaseRefresh!: () => void;
+  const refreshGate = new Promise<void>((resolve) => {
+    releaseRefresh = resolve;
+  });
+  const casePath = new URL(page.url()).hash.slice(1).split("?")[0];
+  await page.route(
+    `**/api/v1${casePath}`,
+    async (route) => {
+      const response = await route.fetch();
+      await refreshGate;
+      await route.fulfill({ response });
+    },
+    { times: 1 },
+  );
   await page.getByRole("button", { name: "증거 반려", exact: true }).click();
   await expect(
     page.getByText("증거를 반려했습니다.", { exact: true }),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "입고 증거 등록", exact: true })
+    .click();
+  await page.getByLabel("입고 증거 원문").fill("재조회 중 입력 보존");
+  const refreshedAssessment = page.waitForResponse((response) =>
+    /\/assessments\/[^/?]+$/.test(new URL(response.url()).pathname),
+  );
+  releaseRefresh();
+  await refreshedAssessment;
+  await expect(page.getByLabel("입고 증거 원문")).toHaveValue(
+    "재조회 중 입력 보존",
+  );
   await proposeEvidence("40");
   await page
     .getByLabel(
