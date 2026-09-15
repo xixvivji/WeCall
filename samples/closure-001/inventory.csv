@@ -1,0 +1,2 @@
+inventory_id,receipt_id,warehouse,quantity,hold_status
+I1,R1,WH1,5,NONE

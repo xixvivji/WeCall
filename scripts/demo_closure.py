@@ -29,24 +29,27 @@ def main():
 
     # A separate complete dataset: 5 known units in stock, no shipments.
     # Do not infer or fill the missing shipment links in the original sample.
-    csvs = {
-        "products": "product_id,name,manufacturer,pack_size,unit\nP1,가상 과자,가상 제조사,100g,EA\n",
-        "receipts": "receipt_id,product_id,lot_number,expiry_date,received_quantity,received_at\nR1,P1,A01,2026-10-31,5,2026-09-01\n",
-        "inventory": "inventory_id,receipt_id,warehouse,quantity,hold_status\nI1,R1,WH1,5,NONE\n",
-        "shipments": "shipment_id,order_id,product_id,quantity,shipped_at\n",
-        "shipmentAllocations": "allocation_id,shipment_id,receipt_id,quantity\n",
-    }
+    sample = Path(__file__).resolve().parents[1] / "samples" / "closure-001"
+    golden = json.loads((sample / "expected.json").read_text())
+    csvs = {("shipmentAllocations" if name == "shipment_allocations" else name):
+            (sample / f"{name}.csv").read_text()
+            for name in ("products", "receipts", "inventory", "shipments", "shipment_allocations")}
     boundary = "wecall-" + uuid.uuid4().hex
     parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="asOf"\r\n\r\n2026-09-09T18:00:00+09:00\r\n'.encode()]
     for field, text in csvs.items():
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="{field}.csv"\r\nContent-Type: text/csv\r\n\r\n{text}\r\n'.encode())
     parts.append(f"--{boundary}--\r\n".encode())
     dataset = request("/api/v1/datasets", b"".join(parts), expected=201, content_type=f"multipart/form-data; boundary={boundary}")
-    case = request("/api/v1/recalls", {"title": "종료 검증 전용 가상 사건", "sourceType": "INTERNAL", "sourceText": "가상 과자 100g 중 제조번호 A01 회수"}, expected=201)
+    case = request("/api/v1/recalls", {"title": "종료 검증 전용 가상 사건", "sourceType": "INTERNAL", "sourceText": (sample / "notice.md").read_text()}, expected=201)
     prefix = f'/api/v1/recalls/{case["id"]}'
-    condition = request(prefix + "/conditions", {"datasetId": dataset["datasetId"], "sourceQuote": "제조번호 A01", "productReviews": {"P1": {"status": "MATCHED", "reason": "가상 상품 확인"}}, "rule": {"op": "EQ", "field": "LOT_NUMBER", "values": ["A01"]}}, expected=201)
+    definition = json.loads((sample / "condition-request.json").read_text())
+    definition["datasetId"] = dataset["datasetId"]
+    condition = request(prefix + "/conditions", definition, expected=201)
     request(prefix + f'/conditions/{condition["id"]}/approval', {"reviewer": "demo-reviewer"})
     run = request(prefix + "/assessments", {"conditionId": condition["id"]}, expected=201)
+    for key in ("inventoryTotals", "shipmentTotals"):
+        if run[key] != golden[key]:
+            raise SystemExit(f"Closure fixture golden mismatch: {key}")
     task = request(prefix + "/tasks", {"taskType": "QUARANTINE", "targetType": "INVENTORY", "assessmentId": run["id"], "targetId": "I1", "title": "가상 재고 5개 격리", "instructions": "합성 자료의 전체 대상 5개 격리 확인", "assignee": "demo-operator", "actor": "demo-reviewer"}, expected=201)
     task_url = prefix + f'/tasks/{task["id"]}'
     task = request(task_url + "/transitions", {"expectedVersion": task["version"], "action": "START", "actor": "demo-operator", "note": "가상 작업"})
@@ -67,8 +70,15 @@ def main():
     final = request(prefix + "/closure", close_body)
     if final["status"] != "CLOSED" or len(final["history"]) != 3:
         raise SystemExit("Unexpected final lifecycle")
+    report = request(prefix + f"/report?assessmentId={run['id']}")
+    if report["assessment"] != run or report["case"]["status"] != golden["finalStatus"]:
+        raise SystemExit("Closed report changed the original assessment or case status")
+    if [event["type"] for event in report["lifecycle"]] != golden["history"]:
+        raise SystemExit("Report lifecycle differs from authored expectations")
+    if not any(t["id"] == task["id"] and t["status"] == "COMPLETED" for t in report["tasks"]):
+        raise SystemExit("Completed response missing from report")
     client.logout()
-    print(json.dumps({"blockedCaseId": unresolved["caseId"], "blockedReason": "UNRESOLVED_SHIPMENTS", "closedCaseId": case["id"], "finalStatus": final["status"], "history": [event["type"] for event in final["history"]]}, ensure_ascii=False, indent=2))
+    print(json.dumps({"blockedCaseId": unresolved["caseId"], "blockedReason": "UNRESOLVED_SHIPMENTS", "closedCaseId": case["id"], "datasetId": dataset["datasetId"], "assessmentId": run["id"], "reportVerified": True, "finalStatus": final["status"], "history": [event["type"] for event in final["history"]]}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

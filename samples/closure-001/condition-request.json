@@ -1,0 +1,16 @@
+{
+  "sourceQuote": "제조번호 A01",
+  "productReviews": {
+    "P1": {
+      "status": "MATCHED",
+      "reason": "가상 제조사·상품명·100g 규격 확인"
+    }
+  },
+  "rule": {
+    "op": "EQ",
+    "field": "LOT_NUMBER",
+    "values": [
+      "A01"
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "inventoryTotals": {
+    "target": 5,
+    "nonTarget": 0,
+    "needsReview": 0
+  },
+  "shipmentTotals": {
+    "target": 0,
+    "nonTarget": 0,
+    "needsReview": 0
+  },
+  "finalStatus": "CLOSED",
+  "history": [
+    "CLOSED",
+    "REOPENED",
+    "CLOSED"
+  ]
+}
