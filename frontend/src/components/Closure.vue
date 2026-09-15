@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from "../drafts";
 import { ref, onMounted, watch, computed } from "vue";
 import { api, user, errorText, dateText, type CaseDetail } from "../api";
 const props = defineProps<{ recall: CaseDetail; assessmentId?: string }>(),
@@ -25,6 +26,10 @@ const check = ref<Check>(),
   confirmed = ref(false),
   note = ref(""),
   reviewer = computed(() => user.value?.roles.includes("REVIEWER"));
+const draft = useDraftGuard(() => ({
+  note: note.value,
+  confirmed: confirmed.value,
+}));
 let generation = 0;
 async function load() {
   const ticket = ++generation;
@@ -72,6 +77,8 @@ async function save() {
     );
     emit("changed");
     note.value = "";
+    confirmed.value = false;
+    draft.saved();
     await load();
   } catch (e) {
     error.value = errorText(e);

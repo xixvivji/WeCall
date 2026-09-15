@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from "../drafts";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import {
   api,
@@ -73,6 +74,37 @@ const receiptId = ref(""),
   receivedAt = ref(""),
   lot = ref(""),
   expiry = ref("");
+const proposalDraft = useDraftGuard(() => ({
+  receipt: receiptId.value,
+  text: documentText.value,
+  quote: sourceQuote.value,
+  product: product.value,
+  quantity: quantity.value,
+  date: receivedAt.value,
+  lot: lot.value,
+  expiry: expiry.value,
+  files: attachmentFiles.value,
+}));
+const reviewDraft = useDraftGuard(() => ({
+  note: note.value,
+  confirmed: confirmed.value,
+}));
+function toggleCreate() {
+  if (creating.value && !proposalDraft.discard()) return;
+  if (creating.value) {
+    receiptId.value = "";
+    documentText.value = "";
+    sourceQuote.value = "";
+    product.value = "";
+    quantity.value = undefined;
+    receivedAt.value = "";
+    lot.value = "";
+    expiry.value = "";
+    attachmentFiles.value = [];
+    proposalDraft.saved();
+  }
+  creating.value = !creating.value;
+}
 const reviewer = computed(() => user.value?.roles.includes("REVIEWER"));
 let generation = 0,
   detailGeneration = 0;
@@ -99,10 +131,12 @@ async function load(reset = false) {
   }
 }
 async function select(id: string) {
+  if (!reviewDraft.discard()) return;
   const ticket = ++detailGeneration;
   selected.value = undefined;
   confirmed.value = false;
   note.value = "";
+  reviewDraft.saved();
   error.value = "";
   try {
     const result = await api<Detail>(
@@ -114,7 +148,7 @@ async function select(id: string) {
   }
 }
 async function create() {
-  if (busy.value) return;
+  if (busy.value || !reviewDraft.discard()) return;
   if (!props.assessment) return;
   busy.value = true;
   error.value = "";
@@ -141,9 +175,11 @@ async function create() {
     );
     selected.value = result;
     attachmentFiles.value = [];
+    proposalDraft.saved();
     creating.value = false;
     confirmed.value = false;
     note.value = "";
+    reviewDraft.saved();
     success.value =
       "증거를 등록했습니다. 검토·승인 전에는 판정이 바뀌지 않습니다.";
     await load(true);
@@ -172,6 +208,7 @@ async function review(approve: boolean) {
       : "증거를 반려했습니다.";
     confirmed.value = false;
     note.value = "";
+    reviewDraft.saved();
     await load();
     emit("updated");
   } catch (e) {
@@ -211,11 +248,7 @@ onUnmounted(() => {
     <section class="panel">
       <div class="section-heading">
         <h2>입고 증거 보완</h2>
-        <button
-          v-if="!closed"
-          :disabled="!assessment"
-          @click="creating = !creating"
-        >
+        <button v-if="!closed" :disabled="!assessment" @click="toggleCreate">
           {{ creating ? "등록 닫기" : "입고 증거 등록" }}
         </button>
       </div>

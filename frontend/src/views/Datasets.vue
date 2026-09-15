@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from "../drafts";
 import { ref, onMounted, computed, nextTick } from "vue";
 import {
   api,
@@ -42,6 +43,17 @@ const files = [
   ["shipments", "출고"],
   ["shipmentAllocations", "출고·입고 연결"],
 ] as const;
+const selectedFiles = ref<File[]>([]);
+const draft = useDraftGuard(() => ({
+  asOf: asOf.value,
+  files: selectedFiles.value,
+}));
+function filesChanged() {
+  selectedFiles.value = [
+    ...(form.value?.querySelectorAll<HTMLInputElement>('input[type="file"]') ||
+      []),
+  ].flatMap((input) => Array.from(input.files || []));
+}
 let generation = 0;
 async function load() {
   const ticket = ++generation;
@@ -86,6 +98,8 @@ async function upload() {
     success.value = `등록 완료 · 연결 기록이 없는 출고 ${result.unlinkedShipmentQuantity} EA는 확인 필요로 남습니다.`;
     form.value?.reset();
     asOf.value = "";
+    selectedFiles.value = [];
+    draft.saved();
     page.value = 0;
     await load();
     await nextTick();
@@ -211,7 +225,7 @@ onMounted(load);
       UTF-8 CSV 5종을 함께 등록하세요. 파일당 5 MiB, 데이터 10,000행까지
       지원합니다. 연결 기록은 실제 확인된 내용만 입력하세요.
     </p>
-    <form ref="form" @submit.prevent="upload">
+    <form ref="form" @change="filesChanged" @submit.prevent="upload">
       <label
         >데이터 기준 시각 (현재 기기 시간대)<input
           v-model="asOf"

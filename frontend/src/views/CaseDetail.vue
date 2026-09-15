@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { confirmDrafts } from "../drafts";
 import { ref, onMounted, computed, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -14,6 +15,7 @@ import {
   type Assessment,
   type Rule,
 } from "../api";
+import NextActions from "../components/NextActions.vue";
 import CaseReport from "../components/CaseReport.vue";
 import CaseHistory from "../components/CaseHistory.vue";
 import ConditionForm from "../components/ConditionForm.vue";
@@ -39,6 +41,11 @@ const requestedTab =
     : "overview";
 const explicitRun = typeof route.query.assessment === "string";
 const linkNotice = ref("");
+async function changeRun(event: Event) {
+  const select = event.target as HTMLSelectElement;
+  await navigate(tab.value, select.value);
+  select.value = runId.value;
+}
 function navigate(tabName: string, selectedRun = runId.value) {
   return router.push({
     path: route.path,
@@ -62,6 +69,7 @@ async function copyViewLink() {
   }
 }
 const id = String(route.params.id),
+  revision = ref(0),
   recall = ref<CaseDetail>(),
   conditions = ref<Condition[]>([]),
   runs = ref<RunRow[]>([]),
@@ -105,6 +113,7 @@ async function load() {
       );
     }
     if (runId.value) await loadRun();
+    revision.value++;
   } catch (e) {
     error.value = errorText(e);
   }
@@ -159,7 +168,6 @@ async function assess(condition: Condition) {
     const run = await api<Assessment>(`/api/v1/recalls/${id}/assessments`, {
       conditionId: condition.id,
     });
-    runId.value = run.id;
     await load();
     await navigate("impact", run.id);
     success.value = "판정 결과를 저장했습니다.";
@@ -170,8 +178,6 @@ async function assess(condition: Condition) {
   }
 }
 async function showEvidenceAssessment(id: string) {
-  runId.value = id;
-  await load();
   await navigate("impact", id);
 }
 function ruleText(rule: Rule): string {
@@ -245,7 +251,12 @@ onMounted(async () => {
       </button>
     </nav>
     <template v-if="tab === 'overview'"
-      ><div class="two-col">
+      ><NextActions
+        :recall="recall"
+        :assessment-id="assessment?.id"
+        :revision="revision"
+        @create-condition="creating = true" />
+      <div class="two-col">
         <section class="panel">
           <h2>회수 요청 원문</h2>
           <div class="prewrap">{{ recall.sourceText }}</div>
@@ -253,7 +264,14 @@ onMounted(async () => {
         <section class="panel">
           <div class="section-heading">
             <h2>조건 검토</h2>
-            <button v-if="reviewer && !closed" @click="creating = !creating">
+            <button
+              v-if="reviewer && !closed"
+              @click="
+                !creating || confirmDrafts()
+                  ? (creating = !creating)
+                  : undefined
+              "
+            >
               {{ creating ? "작성 닫기" : "새 조건 작성" }}
             </button>
           </div>
@@ -326,7 +344,7 @@ onMounted(async () => {
     <template v-else
       ><section v-if="!['comparison', 'history'].includes(tab)" class="panel">
         <label
-          >조회·작업 기준 판정<select v-model="runId" @change="navigate(tab)">
+          >조회·작업 기준 판정<select :value="runId" @change="changeRun">
             <option value="">판정 선택</option>
             <option v-for="run in runs" :key="run.id" :value="run.id">
               조건 v{{

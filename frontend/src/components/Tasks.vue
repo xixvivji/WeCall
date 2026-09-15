@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { confirmDrafts, useDraftGuard } from "../drafts";
 import { ref, onMounted, computed, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import FilePicker from "./FilePicker.vue";
@@ -70,6 +71,47 @@ const title = ref(""),
   note = ref(""),
   proof = ref(""),
   newAssignee = ref("");
+const createDraft = useDraftGuard(() => ({
+  title: title.value,
+  instructions: instructions.value,
+  taskType: taskType.value,
+  targetType: targetType.value,
+  targetId: targetId.value,
+  assignee: assignee.value,
+}));
+const detailDraft = useDraftGuard(() => ({
+  note: note.value,
+  assignee: newAssignee.value,
+}));
+const proofDraft = useDraftGuard(() => ({
+  proof: proof.value,
+  files: proofFiles.value,
+}));
+function toggleCreate() {
+  if (creating.value && !createDraft.discard()) return;
+  if (creating.value) {
+    title.value = "";
+    instructions.value = "";
+    taskType.value = "QUARANTINE";
+    targetType.value = "CASE";
+    targetId.value = "";
+    assignee.value = "";
+    createDraft.saved();
+  }
+  creating.value = !creating.value;
+}
+function closeDetail() {
+  if (!confirmDrafts()) return;
+  detailGeneration++;
+  selected.value = undefined;
+  selecting.value = false;
+  note.value = "";
+  proof.value = "";
+  proofFiles.value = [];
+  newAssignee.value = "";
+  detailDraft.saved();
+  proofDraft.saved();
+}
 const reviewer = computed(() => user.value?.roles.includes("REVIEWER")),
   canWork = computed(
     () => reviewer.value || selected.value?.assignee === user.value?.username,
@@ -86,6 +128,7 @@ async function load() {
   }
 }
 async function select(id: string, preserveDraft = false) {
+  if (!preserveDraft && !confirmDrafts()) return;
   const ticket = ++detailGeneration;
   selecting.value = true;
   error.value = "";
@@ -108,6 +151,10 @@ async function select(id: string, preserveDraft = false) {
     newAssignee.value = task.assignee || "";
     conflict.value = false;
     refreshed.value = preserveDraft;
+    if (!preserveDraft) {
+      detailDraft.saved();
+      proofDraft.saved();
+    }
   } catch (e) {
     if (ticket === detailGeneration) error.value = errorText(e);
   } finally {
@@ -131,6 +178,7 @@ async function create() {
     creating.value = false;
     title.value = "";
     instructions.value = "";
+    createDraft.saved();
     await load();
   } catch (e) {
     error.value = errorText(e);
@@ -160,10 +208,16 @@ async function act(path: string, body: Record<string, unknown>) {
         : { ...body, expectedVersion: selected.value.version },
     );
     refreshed.value = false;
-    note.value = "";
-    proof.value = "";
-    proofFiles.value = [];
-    proofPickerKey.value++;
+    if (path === "proofs") {
+      proof.value = "";
+      proofFiles.value = [];
+      proofPickerKey.value++;
+      proofDraft.saved();
+    } else {
+      note.value = "";
+      newAssignee.value = selected.value?.assignee || "";
+      detailDraft.saved();
+    }
     await load();
   } catch (e) {
     conflict.value = e instanceof ApiError && e.status === 409;
@@ -204,10 +258,7 @@ onMounted(async () => {
             tasks.length
           }}</span>
         </h2>
-        <button
-          v-if="reviewer && !effectivelyClosed"
-          @click="creating = !creating"
-        >
+        <button v-if="reviewer && !effectivelyClosed" @click="toggleCreate">
           {{ creating ? "등록 닫기" : "작업 만들기" }}
         </button>
       </div>
@@ -325,15 +376,7 @@ onMounted(async () => {
     <section v-if="selected" class="panel">
       <div class="section-heading">
         <h2>{{ selected.title }}</h2>
-        <button
-          @click="
-            detailGeneration++;
-            selected = undefined;
-            selecting = false;
-          "
-        >
-          상세 닫기
-        </button>
+        <button @click="closeDetail">상세 닫기</button>
       </div>
       <button :disabled="selecting" @click="select(selected.id, true)">
         최신 작업 불러오기
