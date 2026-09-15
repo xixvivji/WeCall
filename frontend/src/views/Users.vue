@@ -28,21 +28,27 @@ const selected = ref<Account>(),
       createdAt: string;
     }[]
   >([]);
+const listError = ref(""),
+  detailError = ref(""),
+  detailLoading = ref(false);
 let detailRequest = 0;
-async function select(account: Account) {
+async function select(account: Account, retry = false) {
   if (busy.value) return;
   const ticket = ++detailRequest;
   selected.value = { ...account };
-  note.value = "";
+  if (!retry) note.value = "";
   events.value = [];
-  error.value = "";
+  detailError.value = "";
+  detailLoading.value = true;
   try {
     const rows = await api<typeof events.value>(
       `/api/users/${encodeURIComponent(account.username)}/events`,
     );
     if (ticket === detailRequest) events.value = rows;
   } catch (e) {
-    if (ticket === detailRequest) error.value = errorText(e);
+    if (ticket === detailRequest) detailError.value = errorText(e);
+  } finally {
+    if (ticket === detailRequest) detailLoading.value = false;
   }
 }
 async function changeStatus() {
@@ -77,10 +83,12 @@ const reviewer = computed(() => user.value?.roles.includes("REVIEWER"));
 async function load() {
   if (!reviewer.value) return;
   loading.value = true;
+  listError.value = "";
+  accounts.value = [];
   try {
     accounts.value = await api("/api/users");
   } catch (e) {
-    error.value = errorText(e);
+    listError.value = errorText(e);
   } finally {
     loading.value = false;
   }
@@ -179,12 +187,27 @@ onMounted(load);
     </section>
     <section class="panel list-panel">
       <div class="list-caption">
-        <strong>팀 계정</strong><span>{{ accounts.length }}명</span>
+        <strong>팀 계정</strong
+        ><span v-if="!loading && !listError">{{ accounts.length }}명</span>
       </div>
+      <p v-if="!loading && !listError && accounts.length" class="note small">
+        표를 좌우로 스크롤하면 나머지 항목을 볼 수 있습니다.
+      </p>
       <p v-if="loading" class="empty" role="status">
         계정을 불러오는 중입니다…
       </p>
-      <div v-else class="table-scroll">
+      <p v-else-if="listError" class="error" role="alert">
+        {{ listError }}
+        <button :disabled="busy" @click="load">계정 다시 조회</button>
+      </p>
+      <p v-else-if="!accounts.length" class="empty">등록된 계정이 없습니다.</p>
+      <div
+        v-else
+        class="table-scroll"
+        role="region"
+        aria-label="팀 계정 표"
+        tabindex="0"
+      >
         <table>
           <thead>
             <tr>
@@ -237,7 +260,16 @@ onMounted(load);
       </form>
       <p v-else class="note">본인의 계정은 비활성화할 수 없습니다.</p>
       <h3>최근 변경 이력 (최대 100건)</h3>
-      <p v-if="!events.length" class="muted">변경 기록이 없습니다.</p>
+      <p v-if="detailLoading" class="empty" role="status">
+        변경 이력을 불러오는 중입니다…
+      </p>
+      <p v-else-if="detailError" class="error" role="alert">
+        {{ detailError }}
+        <button :disabled="busy" @click="select(selected, true)">
+          변경 이력 다시 조회
+        </button>
+      </p>
+      <p v-else-if="!events.length" class="empty">변경 기록이 없습니다.</p>
       <div v-for="event in events" :key="event.id" class="evidence-line">
         <strong>{{
           event.type === "PASSWORD_CHANGED"
