@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { confirmDrafts } from "./drafts";
 import { onMounted, ref } from "vue";
 import {
   ClipboardList,
@@ -43,6 +44,7 @@ async function signIn() {
   }
 }
 async function signOut() {
+  if (!confirmDrafts()) return;
   try {
     await logout();
   } catch (e) {

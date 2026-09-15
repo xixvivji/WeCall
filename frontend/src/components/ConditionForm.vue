@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from "../drafts";
 import { ref, watch } from "vue";
 import {
   api,
@@ -22,6 +23,12 @@ const datasetId = ref(""),
   error = ref(""),
   busy = ref(false),
   loading = ref(false);
+const draft = useDraftGuard(() => ({
+  datasetId: datasetId.value,
+  quote: quote.value,
+  rule: rule.value,
+  reviews: reviews.value,
+}));
 let generation = 0;
 async function load(reset = false) {
   if (reset) page.value = 0;
@@ -65,6 +72,7 @@ async function save() {
       rule: rule.value,
       productReviews: reviews.value,
     });
+    draft.saved();
     emit("saved");
   } catch (e) {
     error.value = errorText(e);

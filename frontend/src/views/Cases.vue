@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDraftGuard } from "../drafts";
 import { onMounted, onUnmounted, ref } from "vue";
 import { Search, Plus, ArrowUpRight } from "@lucide/vue";
 import {
@@ -26,6 +27,21 @@ const router = useRouter(),
 const title = ref(""),
   source = ref("SUPPLIER"),
   text = ref("");
+const draft = useDraftGuard(() => ({
+  title: title.value,
+  source: source.value,
+  text: text.value,
+}));
+function toggleCreate() {
+  if (creating.value && !draft.discard()) return;
+  if (creating.value) {
+    title.value = "";
+    source.value = "SUPPLIER";
+    text.value = "";
+    draft.saved();
+  }
+  creating.value = !creating.value;
+}
 let generation = 0;
 async function load(reset = false) {
   if (reset) page.value = 0;
@@ -61,6 +77,7 @@ async function create() {
       sourceType: source.value,
       sourceText: text.value,
     });
+    draft.saved();
     await router.push("/recalls/" + result.id);
   } catch (e) {
     createError.value = errorText(e);
@@ -94,7 +111,7 @@ onUnmounted(() => {
     <button
       v-if="user?.roles.includes('REVIEWER')"
       class="primary"
-      @click="creating = !creating"
+      @click="toggleCreate"
     >
       <Plus :size="18" />{{ creating ? "등록 닫기" : "새 사건 등록" }}
     </button>

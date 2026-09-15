@@ -1,5 +1,6 @@
 import { createApp } from "vue";
 import { createRouter, createWebHashHistory } from "vue-router";
+import { confirmDrafts } from "./drafts";
 import App from "./App.vue";
 import Cases from "./views/Cases.vue";
 import CaseDetail from "./views/CaseDetail.vue";
@@ -24,4 +25,7 @@ const router = createRouter({
     { path: "/:pathMatch(.*)*", redirect: "/" },
   ],
 });
+router.beforeEach(
+  (to, from) => to.fullPath === from.fullPath || confirmDrafts(),
+);
 createApp(App).use(router).mount("#app");
