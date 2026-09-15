@@ -210,6 +210,9 @@ onMounted(async () => {
   <p v-if="error" class="error" role="alert">
     {{ error }} <button @click="load">다시 조회</button>
   </p>
+  <p v-if="!recall && !error" class="loading" role="status">
+    사건을 불러오는 중입니다…
+  </p>
   <p v-if="success" class="success" role="status">{{ success }}</p>
   <template v-if="recall"
     ><div class="page-heading">
