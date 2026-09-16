@@ -88,6 +88,9 @@ test("AI draft requires human product review and preserves edits; operators cann
   await expect(
     page.getByText("실제 모델 응답", { exact: false }),
   ).toBeVisible();
+  await expect(
+    page.getByText("제조번호 K01 일치", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "조건과 상품 연결 검토" }).click();
   await expect(page.getByLabel("원문 근거 인용")).toHaveValue(
     "제조번호 K01 회수",

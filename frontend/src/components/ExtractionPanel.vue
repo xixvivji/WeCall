@@ -60,6 +60,21 @@ const errors: Record<string, string> = {
   INVALID_AI_RESPONSE:
     "검증할 수 없는 응답이므로 조건 초안에 사용하지 않았습니다.",
 };
+function describe(rule: Rule): string {
+  if (rule.op === "AND" || rule.op === "OR")
+    return (
+      "(" +
+      (rule.children ?? [])
+        .map(describe)
+        .join(rule.op === "AND" ? " 그리고 " : " 또는 ") +
+      ")"
+    );
+  const field = rule.field === "LOT_NUMBER" ? "제조번호" : "소비기한";
+  const values = rule.values ?? [];
+  if (rule.op === "BETWEEN")
+    return `${field} ${values.join(" ~ ")} (양 끝 포함)`;
+  return `${field} ${values.join(" 또는 ")} 일치`;
+}
 async function load() {
   clearTimeout(timer);
   error.value = "";
@@ -200,12 +215,8 @@ onUnmounted(() => {
         </p>
         <h3>원문 근거</h3>
         <p class="prewrap">{{ selected.output.sourceQuote }}</p>
-        <details>
-          <summary>추출 조건 구조 확인</summary>
-          <pre class="prewrap">{{
-            JSON.stringify(selected.output.rule, null, 2)
-          }}</pre>
-        </details>
+        <h3>추출 조건</h3>
+        <p class="prewrap">{{ describe(selected.output.rule) }}</p>
         <ul>
           <li v-for="warning in selected.output.warnings" :key="warning">
             {{ warning }}
