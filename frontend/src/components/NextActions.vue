@@ -41,6 +41,7 @@ async function load() {
   }
 }
 const names: Record<string, [string, string]> = {
+  UNREVIEWED_EXTRACTIONS: ["AI 분석 결과 검토", "ai"],
   NO_CONDITION: ["회수 조건 준비", "overview"],
   PENDING_CONDITIONS: ["조건 승인 검토", "overview"],
   NO_ASSESSMENT: ["기준 판정 준비", "overview"],

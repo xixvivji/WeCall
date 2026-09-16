@@ -42,11 +42,11 @@ class ExtractionResponse(BaseModel):
 
 
 class Provider(Protocol):
-    def extract(self, request: ExtractionRequest) -> ExtractionResponse: ...
+    async def extract(self, request: ExtractionRequest) -> ExtractionResponse: ...
 
 
 class FixtureProvider:
-    def extract(self, request: ExtractionRequest) -> ExtractionResponse:
+    async def extract(self, request: ExtractionRequest) -> ExtractionResponse:
         fixture = json.loads((Path(__file__).parent / "fixtures/recall-001.json").read_text())
         if request.sourceText != fixture["sourceText"]:
             raise HTTPException(422, detail={"code": "UNSUPPORTED_FIXTURE", "message": "Only the exact documented synthetic notice is supported"})
@@ -61,13 +61,16 @@ class FixtureProvider:
 
 def provider() -> Provider:
     mode = os.environ.get("WECALL_AI_PROVIDER", "disabled")
+    if mode == "ollama-local":
+        from app.local_provider import LocalProvider
+        return LocalProvider()
     if mode == "fixture":
         return FixtureProvider()
     raise HTTPException(503, detail={"code": "MODEL_NOT_CONFIGURED", "message": "No model provider configured"})
 
 
 @router.post("/v1/extractions", response_model=ExtractionResponse, tags=["extraction"])
-def extract(request: ExtractionRequest, x_service_token: str | None = Header(default=None)):
+async def extract(request: ExtractionRequest, x_service_token: str | None = Header(default=None)):
     expected = os.environ.get("WECALL_AI_SERVICE_TOKEN", "")
     if not expected:
         raise HTTPException(503, detail={"code": "SERVICE_NOT_CONFIGURED"})
@@ -75,4 +78,4 @@ def extract(request: ExtractionRequest, x_service_token: str | None = Header(def
         raise HTTPException(401, detail={"code": "UNAUTHORIZED_SERVICE"})
     if not request.sourceText.strip():
         raise HTTPException(422, detail={"code": "EMPTY_SOURCE"})
-    return provider().extract(request)
+    return await provider().extract(request)

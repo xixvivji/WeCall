@@ -27,7 +27,7 @@
 | VIEW-02 | 검토 대기함 | 조건·입고 증거·현재 회차 증빙만 집계; 검토 후 새 조회에서 제외; 검토자 전용 | 구현 / WorkspaceQueryTests, workflow.spec.ts |
 | VIEW-03 | 판정 비교 | 기준·비교 버전 명시, 증감 방향 고정, 한쪽 없는 기록 구분, 데이터 차이 안내 | 구현 / comparison.spec.ts, workflow.spec.ts |
 | EXPORT-01 | 판정 CSV | 지정 판정의 결과·버전 ID 반환; 수식 입력 방어; 연결 미확인을 중복 합산하지 않음 | 구현 / RecallWorkflowTests, workflow.spec.ts |
-| AI-01 | AI 호출 계약 | 백엔드 ExtractionClient 교체 가능; 실패·응답·입력 해시 보존; 자동 승인 없음 | 인터페이스·모의 연동 구현 / ExtractionIntegrationTests |
+| AI-01 | AI 호출 계약 | 백엔드 ExtractionClient 교체 가능; 실패·응답·입력 해시 보존; 자동 승인 없음 | 인터페이스·모의 및 로컬 모델 연동 구현 / ExtractionIntegrationTests, Python provider tests |
 | FILE-01 | 증거 파일 첨부 | 허용 파일 검증·안전 저장·업무별 권한·불변 연결·실패 복구·감사 기록 검증 | 로컬 구현 / AttachmentTests, workflow.spec.ts, 정리 스크립트 테스트; [계약](design/attachments-api.md) |
 | FILE-02 | 악성 파일 검사 연동 | clamd 성공 응답만 통과, 시간 제한·위협·장애 차단, 다중 첨부 롤백, 다운로드 재검사 | 어댑터 구현 / ClamdScannerTests, AttachmentTests; 실제 엔진 배치는 별도 |
 | OPS-01 | 운영 배포 | 승인된 환경, HTTPS, 시크릿 관리, 백업 복원, 모니터링·접근 정책 검증 | 미구현 |
@@ -58,3 +58,5 @@ CI 자동 검증과 합성 업무 검증, 주요 화면 예외 처리 보완을 
 모바일 표·긴 텍스트와 계정/데이터 선택 조회 상태를 보완했다. 최종 CI에서 프론트 25건(계산 로직 2건·브라우저 23건)이 통과했다. [모바일·조회 상태 검증](design/frontend-mobile-states.md)을 참고한다.
 
 AI 착수 전 합성 업무 검수를 수행했다. [검수 진행표](validation/acceptance-guide.md)와 [2026-09-15 실행 결과](validation/acceptance-2026-09-15.md)를 참고한다. 현업 담당자 인수 승인은 별도 대기 상태다.
+
+2026-09-16 로컬 AI 조건 추출과 사람 검토 화면을 추가했다. [실행·지원 범위·검증](design/local-ai.md)을 따른다. AI 전면 보류였던 이전 개발 순서는 이 항목으로 갱신하며 OCR·실무 검수·배포는 남아 있다.

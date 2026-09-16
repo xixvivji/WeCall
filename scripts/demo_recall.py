@@ -37,7 +37,10 @@ def main():
     parser.add_argument("--with-evidence", action="store_true", help="Approve synthetic receipt evidence and verify after results")
     parser.add_argument("--with-tasks", action="store_true", help="Assign a response task, review proof and complete it")
     parser.add_argument("--with-extraction", action="store_true", help="Use explicitly enabled FastAPI fixture extraction")
+    parser.add_argument("--with-live-extraction", action="store_true", help="Evaluate the configured local model using synthetic data only")
     args = parser.parse_args()
+    if args.with_extraction and args.with_live_extraction:
+        parser.error("Choose fixture or local live extraction, not both")
     base = args.base_url.rstrip("/")
 
     client = ApiClient(base)
@@ -57,16 +60,19 @@ def main():
     definition = json.loads((SAMPLE / "condition-request.json").read_text())
     definition["datasetId"] = dataset["datasetId"]
     extraction = None
-    if args.with_extraction:
+    if args.with_extraction or args.with_live_extraction:
         extraction = request(prefix + "/extractions", {}, expected=202)
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + (110 if args.with_live_extraction else 30)
         while extraction["status"] in ("QUEUED", "RUNNING") and time.monotonic() < deadline:
             time.sleep(0.25)
             extraction = request(prefix + f'/extractions/{extraction["id"]}')
         if extraction["status"] != "SUCCEEDED":
             raise SystemExit(f"Extraction failed: {extraction['status']} / {extraction['errorCode']}")
-        if extraction["output"]["mode"] != "MOCK":
-            raise SystemExit("This synthetic demo expects explicit MOCK mode")
+        expected_mode = "LIVE" if args.with_live_extraction else "MOCK"
+        if extraction["output"]["mode"] != expected_mode:
+            raise SystemExit("Unexpected extraction mode")
+        if args.with_live_extraction and extraction["output"]["provider"] != "ollama-local":
+            raise SystemExit("This live demo requires the explicit local provider")
         definition["rule"] = extraction["output"]["rule"]
         definition["sourceQuote"] = extraction["output"]["sourceQuote"]
         extraction = request(prefix + f'/extractions/{extraction["id"]}/condition',

@@ -11,11 +11,19 @@ import {
 } from "../api";
 import DatasetPicker from "./DatasetPicker.vue";
 import RuleEditor from "./RuleEditor.vue";
-const props = defineProps<{ caseId: string }>(),
+const props = defineProps<{
+    caseId: string;
+    extraction?: { id: string; rule: Rule; sourceQuote: string };
+  }>(),
   emit = defineEmits<{ saved: [] }>();
 const datasetId = ref(""),
-  quote = ref(""),
-  rule = ref<Rule>({ op: "EQ", field: "LOT_NUMBER", values: [""] }),
+  quote = ref(props.extraction?.sourceQuote ?? ""),
+  rule = ref<Rule>(
+    props.extraction
+      ? JSON.parse(JSON.stringify(props.extraction.rule))
+      : { op: "EQ", field: "LOT_NUMBER", values: [""] },
+  ),
+  reviewNote = ref(""),
   reviews = ref<Definition["productReviews"]>({}),
   products = ref<Page<Product>>(),
   page = ref(0),
@@ -24,6 +32,7 @@ const datasetId = ref(""),
   busy = ref(false),
   loading = ref(false);
 const draft = useDraftGuard(() => ({
+  reviewNote: reviewNote.value,
   datasetId: datasetId.value,
   quote: quote.value,
   rule: rule.value,
@@ -66,12 +75,18 @@ async function save() {
   error.value = "";
   busy.value = true;
   try {
-    await api(`/api/v1/recalls/${props.caseId}/conditions`, {
+    const definition = {
       datasetId: datasetId.value,
       sourceQuote: quote.value,
       rule: rule.value,
       productReviews: reviews.value,
-    });
+    };
+    if (props.extraction)
+      await api(
+        `/api/v1/recalls/${props.caseId}/extractions/${props.extraction.id}/condition`,
+        { definition, note: reviewNote.value },
+      );
+    else await api(`/api/v1/recalls/${props.caseId}/conditions`, definition);
     draft.saved();
     emit("saved");
   } catch (e) {
@@ -83,7 +98,12 @@ async function save() {
 </script>
 <template>
   <form @submit.prevent="save">
-    <h2>새 조건 초안</h2>
+    <h2>
+      {{ extraction ? "AI 결과를 검토해 조건 초안 작성" : "새 조건 초안" }}
+    </h2>
+    <label v-if="extraction"
+      >AI 검토 사유<textarea v-model="reviewNote" required maxlength="2000" />
+    </label>
     <DatasetPicker v-model="datasetId" /><label class="spaced"
       >원문 근거 인용<textarea
         v-model="quote"
