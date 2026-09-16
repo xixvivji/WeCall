@@ -15,6 +15,7 @@ import {
   type Assessment,
   type Rule,
 } from "../api";
+import ExtractionPanel from "../components/ExtractionPanel.vue";
 import NextActions from "../components/NextActions.vue";
 import CaseReport from "../components/CaseReport.vue";
 import CaseHistory from "../components/CaseHistory.vue";
@@ -27,6 +28,7 @@ const route = useRoute(),
   router = useRouter();
 const tabs = [
   "overview",
+  "ai",
   "impact",
   "comparison",
   "evidence",
@@ -237,6 +239,7 @@ onMounted(async () => {
       <button
         v-for="[value, name] in [
           ['overview', '원문 · 조건 검토'],
+          ['ai', 'AI 조건 추출'],
           ['impact', '영향 조회'],
           ['comparison', '판정 비교'],
           ['evidence', '입고 증거'],
@@ -253,6 +256,11 @@ onMounted(async () => {
         {{ name }}
       </button>
     </nav>
+    <ExtractionPanel
+      v-if="tab === 'ai'"
+      :case-id="id"
+      :closed="closed"
+      @updated="load" />
     <template v-if="tab === 'overview'"
       ><NextActions
         :recall="recall"

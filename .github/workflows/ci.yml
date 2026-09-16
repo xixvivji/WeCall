@@ -64,6 +64,14 @@ jobs:
         run: |
           python3 scripts/validate_sample.py
           python3 -m unittest discover -s scripts -p 'test_*.py'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: AI provider contract tests (no model download)
+        run: |
+          python -m pip install uv
+          uv sync --project ai --locked
+          uv run --project ai pytest ai/tests -q
       - name: Backend tests and build
         run: ./backend/gradlew -p backend --no-daemon test bootJar
       - name: Frontend install and build
