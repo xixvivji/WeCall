@@ -110,8 +110,8 @@ class ResponseTaskTests {
         postJson(prefix()+"/"+t.get("id").asText()+"/assignment",new Assignment(t.get("version").asLong(),"test-operator","품질","변경"),409);
     }
     @Test void validatesTargetAndCaseOwnership() throws Exception {
-        postJson(prefix(),new NewTask(TaskType.QUARANTINE,TargetType.INVENTORY,assessment.id(),"MISSING","격리","확인",null,"품질"),400);
         UUID other=(UUID)recalls.createCase(new NewCase("다른 사건",SourceType.INTERNAL,"통보")).get("id");
+        postJson(prefix(),new NewTask(TaskType.QUARANTINE,TargetType.INVENTORY,assessment.id(),"MISSING","격리","확인",null,"품질"),400);
         postJson("/api/v1/recalls/"+other+"/tasks",new NewTask(TaskType.QUARANTINE,TargetType.INVENTORY,assessment.id(),"I1","격리","확인",null,"품질"),404);
         var t=create(); mvc.perform(get("/api/v1/recalls/"+other+"/tasks/"+t.get("id").asText())).andExpect(status().isNotFound());
         postJson(prefix(),new NewTask(TaskType.QUARANTINE,TargetType.INVENTORY,null,"I1","격리","확인",null,"품질"),400);

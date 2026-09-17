@@ -56,7 +56,7 @@ class AuthSecurityTests {
             .andExpect(status().is(expected)).andReturn();
         return json.readTree(result.getResponse().getContentAsByteArray());
     }
-    UUID caseId() {return (UUID)recalls.createCase(new RecallModels.NewCase("인증 검증 사건",RecallModels.SourceType.INTERNAL,"긴급 보류")).get("id");}
+    UUID caseId() throws Exception {return UUID.fromString(postJson(login("auth-reviewer"),"/api/v1/recalls",new RecallModels.NewCase("인증 검증 사건",RecallModels.SourceType.INTERNAL,"긴급 보류"),201).get("id").asText());}
     Map<String,Object> task(UUID caseId,String assignee) {return tasks.create(caseId,new NewTask(TaskType.SALES_HOLD,TargetType.CASE,null,null,"판매보류","지시 확인",assignee,"trusted-fixture"));}
     @Test void dashboardCountsOnlyLatestAssessmentOfOpenCases() throws Exception {
         UUID c=caseId(),d=UUID.randomUUID(),condition=UUID.randomUUID();

@@ -27,9 +27,15 @@ const router = useRouter(),
 const title = ref(""),
   source = ref("SUPPLIER"),
   text = ref("");
-const usedPdf = ref(false);
+const appliedPdf = ref<{ file: File; sha256: string }>();
+let previewFile: File | undefined;
 const extracting = ref(false),
-  pdfPreview = ref<{ text: string; pages: number; scanStatus: string }>(),
+  pdfPreview = ref<{
+    text: string;
+    pages: number;
+    scanStatus: string;
+    sha256: string;
+  }>(),
   pdfError = ref("");
 async function extractPdf(event: Event) {
   const input = event.target as HTMLInputElement;
@@ -47,6 +53,7 @@ async function extractPdf(event: Event) {
     const form = new FormData();
     form.append("file", file);
     pdfPreview.value = await api("/api/v1/source-pdf", form);
+    previewFile = file;
   } catch (e) {
     pdfError.value = errorText(e);
   } finally {
@@ -61,7 +68,7 @@ function applyPdf() {
   )
     return;
   text.value = pdfPreview.value.text;
-  usedPdf.value = true;
+  appliedPdf.value = { file: previewFile!, sha256: pdfPreview.value.sha256 };
   pdfPreview.value = undefined;
 }
 const draft = useDraftGuard(() => ({
@@ -69,6 +76,7 @@ const draft = useDraftGuard(() => ({
   source: source.value,
   text: text.value,
   pdfPreview: pdfPreview.value?.text,
+  pdf: appliedPdf.value,
 }));
 function toggleCreate() {
   if (extracting.value || saving.value) return;
@@ -77,7 +85,8 @@ function toggleCreate() {
     title.value = "";
     source.value = "SUPPLIER";
     text.value = "";
-    usedPdf.value = false;
+    appliedPdf.value = undefined;
+    previewFile = undefined;
     pdfPreview.value = undefined;
     pdfError.value = "";
     draft.saved();
@@ -114,14 +123,32 @@ async function create() {
   saving.value = true;
   createError.value = "";
   try {
-    const result = await api<CaseRow>("/api/v1/recalls", {
+    const metadata = {
       title: title.value,
       sourceType: source.value,
       sourceText: text.value,
-    });
+    };
+    let result: CaseRow;
+    if (appliedPdf.value) {
+      const form = new FormData();
+      form.append("file", appliedPdf.value.file);
+      form.append(
+        "metadata",
+        new Blob(
+          [
+            JSON.stringify({
+              recall: metadata,
+              expectedSha256: appliedPdf.value.sha256,
+            }),
+          ],
+          { type: "application/json" },
+        ),
+      );
+      result = await api<CaseRow>("/api/v1/recalls/from-pdf", form);
+    } else result = await api<CaseRow>("/api/v1/recalls", metadata);
     draft.saved();
     await router.push(
-      "/recalls/" + result.id + (usedPdf.value ? "?tab=ai" : ""),
+      "/recalls/" + result.id + (appliedPdf.value ? "?tab=ai" : ""),
     );
   } catch (e) {
     createError.value = errorText(e);
@@ -189,8 +216,8 @@ onUnmounted(() => {
         />
       </label>
       <p class="muted">
-        최대 10 MiB·50쪽. 로컬 서버에서 텍스트를 추출합니다. PDF 원본은 보관하지
-        않으며, 확인한 텍스트만 사건에 저장합니다. 스캔 PDF의 OCR은 아직
+        최대 10 MiB·50쪽. 로컬 서버에서 텍스트를 추출합니다. 사건 등록 시 PDF
+        원본·추출본·확인한 텍스트를 함께 보관합니다. 스캔 PDF의 OCR은 아직
         지원하지 않습니다.
       </p>
       <p v-if="extracting" role="status">PDF 원문을 추출하고 있습니다…</p>
@@ -221,6 +248,12 @@ onUnmounted(() => {
           미리보기 버리기
         </button>
       </div>
+      <p v-if="appliedPdf" class="muted">
+        보관할 원본: {{ appliedPdf.file.name }}
+        <button type="button" @click="appliedPdf = undefined">
+          PDF 연결 해제
+        </button>
+      </p>
       <label
         >회수 원문<textarea
           v-model="text"
