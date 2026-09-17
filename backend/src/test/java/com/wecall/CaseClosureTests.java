@@ -135,11 +135,11 @@ class CaseClosureTests {
         closures.reopen(caseId,new ReopenRequest(1L,"검토자","새 자료 검토"));newTask();
     }
     @Test void validatesApprovalAndCaseOwnership() throws Exception {
+        UUID other=(UUID)recalls.createCase(new NewCase("다른 사건",SourceType.INTERNAL,"통보")).get("id");
         finishTask();postJson(prefix()+"/closure",new CloseRequest(run.id(),0L,"검토자","검토",false),400);
         postJson(prefix()+"/closure",new CloseRequest(run.id(),0L," ","검토",true),400);
         postJson(prefix()+"/closure",closeBody(99),409);
         postJson("/api/v1/recalls/"+UUID.randomUUID()+"/closure",closeBody(0),404);
-        UUID other=(UUID)recalls.createCase(new NewCase("다른 사건",SourceType.INTERNAL,"통보")).get("id");
         mvc.perform(get("/api/v1/recalls/"+other+"/closure-check").param("assessmentId",run.id().toString())).andExpect(status().isNotFound());
     }
     @Test void concurrentClosuresHaveOneWinner() throws Exception {

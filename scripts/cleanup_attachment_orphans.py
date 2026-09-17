@@ -35,7 +35,7 @@ def main():
         if check.returncode != 1 or check.stdout.strip():
             parser.error('Backend port is listening or could not be checked; stop every backend first')
     # Database failures abort before any deletion. This tool targets the repository's local compose DB only.
-    result = subprocess.run(['docker','compose','exec','-T','postgres','psql','-U','wecall','-d','wecall','-At','-v','ON_ERROR_STOP=1','-c','SELECT id FROM evidence_attachment'], cwd=Path(__file__).resolve().parents[1], check=True, capture_output=True, text=True)
+    result = subprocess.run(['docker','compose','exec','-T','postgres','psql','-U','wecall','-d','wecall','-At','-v','ON_ERROR_STOP=1','-c','SELECT id FROM evidence_attachment UNION SELECT id FROM source_document'], cwd=Path(__file__).resolve().parents[1], check=True, capture_output=True, text=True)
     referenced = {line.strip() for line in result.stdout.splitlines() if line.strip()}
     found = candidates(root, referenced, time.time())
     for path in found:

@@ -101,6 +101,19 @@ class ExtractionIntegrationTests {
         var run=recalls.assess(caseId,conditionId);assertThat(run.inventoryTotals().target()).isEqualTo(110);assertThat(run.shipmentTotals().needsReview()).isEqualTo(20);
         postJson(prefix()+"/"+id+"/condition",new ExtractionModels.Conversion(condition,"중복"),409);
     }
+    @Test void oldSourceVersionCannotBecomeNewConditionEvenAfterTextRestored() throws Exception {
+        UUID id=enqueue();poll();
+        String original=recalls.getCase(caseId).get("sourceText").toString();
+        String revisions="/api/v1/recalls/"+caseId+"/source/revisions";
+        postJson(revisions,Map.of("expectedVersion",1,"sourceText",original+"\n검토 메모","note","문서 재검토"),201);
+        postJson(revisions,Map.of("expectedVersion",2,"sourceText",original,"note","원문 복원"),201);
+        postJson(prefix()+"/"+id+"/condition",new ExtractionModels.Conversion(condition,"이전 분석 시도"),409);
+        assertThat(jobs.get(caseId,id).get("sourceText")).isEqualTo(original);
+        assertThat(jobs.get(caseId,id).get("reviewStatus")).isEqualTo("PENDING");
+        UUID latest=enqueue();poll();
+        assertThat(jobs.get(caseId,latest).get("sourceVersion")).isEqualTo(3L);
+        postJson(prefix()+"/"+latest+"/condition",new ExtractionModels.Conversion(condition,"최신 원문 확인"),201);
+    }
     @Test void invalidOrUnboundResponsesFailAndNeverCreateConditions() {
         for(String mode:List.of("WRONG_ID","WRONG_HASH","BAD_RULE","BAD_QUOTE","INVALID","HUGE")) {
             MODE.set(mode);UUID id=enqueue();poll();

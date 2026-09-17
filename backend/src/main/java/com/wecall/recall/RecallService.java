@@ -63,12 +63,14 @@ public class RecallService {
     public Map<String,Object> createCase(NewCase request) {
         UUID id=UUID.randomUUID();
         jdbc.update("INSERT INTO recall_case(id,title,source_type,source_text) VALUES (?,?,?,?)",id,request.title(),request.sourceType().name(),request.sourceText());
+        jdbc.update("INSERT INTO source_revision(case_id,version,source_text,actor,note) VALUES (?,1,?,?,?)",id,request.sourceText(),com.wecall.auth.CurrentActor.username(),"사건 등록 시 확인한 원문");
         return getCase(id);
     }
     public Map<String,Object> getCase(UUID id) {
         var row=one("SELECT * FROM recall_case WHERE id=?",id);
         Map<String,Object> result=new LinkedHashMap<>(Map.of("id",id,"title",row.get("title"),"sourceType",row.get("source_type"),"sourceText",row.get("source_text"),
             "createdAt",row.get("created_at").toString(),"conditions",jdbc.queryForList("SELECT id,version,status FROM recall_condition WHERE case_id=? ORDER BY version",id)));
+        result.put("sourceVersion",row.get("source_version"));
         result.put("status",row.get("status")); result.put("lifecycleVersion",row.get("lifecycle_version"));
         result.put("closedAt",row.get("closed_at")==null?null:row.get("closed_at").toString());
         return result;

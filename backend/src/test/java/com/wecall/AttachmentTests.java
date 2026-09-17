@@ -52,6 +52,71 @@ class AttachmentTests {
             .andExpect(status().isForbidden());
         assertThat(diskCount()).isZero();
     }
+    MockMultipartHttpServletRequestBuilder sourceRequest(byte[] bytes, String hash) throws Exception {
+        return multipart("/api/v1/recalls/from-pdf")
+            .file(new MockMultipartFile("metadata","","application/json",json.writeValueAsBytes(Map.of("recall",Map.of("title","PDF 보관 합성 사건","sourceType","INTERNAL","sourceText","검토 후 수정 A02"),"expectedSha256",hash))))
+            .file(new MockMultipartFile("file","notice.pdf","application/pdf",bytes));
+    }
+    @Test void sourceDocumentPersistsExactBytesExtractedAndReviewedText() throws Exception {
+        byte[] bytes=SourcePdfTests.pdf("Recall lot A01",1);
+        var result=mvc.perform(sourceRequest(bytes,AttachmentService.hash(bytes)).with(csrf())).andExpect(status().isCreated()).andReturn();
+        UUID id=UUID.fromString(json.readTree(result.getResponse().getContentAsByteArray()).get("id").asText());
+        UUID documentId=jdbc.queryForObject("SELECT id FROM source_document WHERE case_id=?",UUID.class,id);
+        assertThat(Files.readAllBytes(ROOT.resolve(documentId+".blob"))).isEqualTo(bytes);
+        mvc.perform(get("/api/v1/recalls/"+id+"/source"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.document.uploadedBy").value("reviewer"))
+            .andExpect(jsonPath("$.document.scanStatus").value("NOT_SCANNED"));
+        mvc.perform(get("/api/v1/recalls/"+id+"/source/revisions/1"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.sourceText").value("검토 후 수정 A02"))
+            .andExpect(jsonPath("$.extractedText").value("Recall lot A01"));
+        String download="/api/v1/recalls/"+id+"/source/documents/"+documentId+"/download";
+        var response=mvc.perform(get(download).with(user("operator").roles("OPERATOR"))).andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("X-Content-Type-Options","nosniff")).andReturn().getResponse();
+        assertThat(response.getContentAsByteArray()).isEqualTo(bytes);
+        assertThat(response.getHeader("Content-Disposition")).startsWith("attachment;");
+        mvc.perform(get("/api/v1/recalls/"+caseId+"/source/documents/"+documentId+"/download")).andExpect(status().isNotFound());
+        mvc.perform(get(download).with(anonymous())).andExpect(status().isUnauthorized());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM source_document_event WHERE document_id=?",Long.class,documentId)).isEqualTo(2);
+        org.mockito.Mockito.doThrow(new RecallService.Failure(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"검사 장애")).when(scanner).scan(org.mockito.ArgumentMatchers.any(byte[].class));
+        mvc.perform(get(download)).andExpect(status().isServiceUnavailable());
+        org.mockito.Mockito.reset(scanner);
+        Files.write(ROOT.resolve(documentId+".blob"),new byte[]{1});
+        mvc.perform(get(download)).andExpect(status().isServiceUnavailable());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM source_document_event WHERE document_id=?",Long.class,documentId)).isEqualTo(2);
+    }
+    @Test void sourceRegistrationRejectsMismatchAuthorizationAndRollsBackStorageFailure() throws Exception {
+        byte[] bytes=SourcePdfTests.pdf("Recall A01",1);String hash=AttachmentService.hash(bytes);
+        mvc.perform(sourceRequest(bytes,"0".repeat(64)).with(csrf())).andExpect(status().isConflict());
+        mvc.perform(sourceRequest(bytes,hash).with(csrf()).with(user("operator").roles("OPERATOR"))).andExpect(status().isForbidden());
+        mvc.perform(sourceRequest(bytes,hash)).andExpect(status().isForbidden());
+        org.mockito.Mockito.doAnswer(invocation->{throw new IOException("synthetic disk failure");}).when(storage).write(org.mockito.ArgumentMatchers.any(UUID.class),org.mockito.ArgumentMatchers.any(byte[].class));
+        mvc.perform(sourceRequest(bytes,hash).with(csrf())).andExpect(status().isServiceUnavailable());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM recall_case",Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM source_document",Long.class)).isZero();
+        assertThat(diskCount()).isZero();
+    }
+    @Test void sourceDatabaseFailureRemovesAlreadyWrittenBlob() throws Exception {
+        byte[] bytes=SourcePdfTests.pdf("Recall A01",1);
+        jdbc.execute("ALTER TABLE source_document ADD CONSTRAINT synthetic_reject_source CHECK (filename <> 'notice.pdf')");
+        try {
+            assertThatThrownBy(()->mvc.perform(sourceRequest(bytes,AttachmentService.hash(bytes)).with(csrf()))).isInstanceOf(Exception.class);
+            assertThat(diskCount()).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM recall_case",Long.class)).isEqualTo(1);
+        } finally {jdbc.execute("ALTER TABLE source_document DROP CONSTRAINT synthetic_reject_source");}
+    }
+    @Test void sourceRevisionsPreservePastActorAndRejectStaleClosedOrUnauthorizedEdits() throws Exception {
+        String url="/api/v1/recalls/"+caseId+"/source/revisions";
+        var body=json.writeValueAsBytes(Map.of("expectedVersion",1,"sourceText","수정한 원문","note","오타 수정"));
+        mvc.perform(post(url).with(csrf()).with(user("second-reviewer").roles("REVIEWER")).contentType("application/json").content(body))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.version").value(2)).andExpect(jsonPath("$.actor").value("second-reviewer"));
+        mvc.perform(get(url+"/1")).andExpect(status().isOk()).andExpect(jsonPath("$.actor").value("reviewer"));
+        mvc.perform(post(url).with(csrf()).contentType("application/json").content(body)).andExpect(status().isConflict());
+        mvc.perform(post(url).with(csrf()).with(user("operator").roles("OPERATOR")).contentType("application/json").content(body)).andExpect(status().isForbidden());
+        jdbc.update("UPDATE recall_case SET status='CLOSED',closed_at=now() WHERE id=?",caseId);
+        mvc.perform(post(url).with(csrf()).contentType("application/json").content(json.writeValueAsBytes(Map.of("expectedVersion",2,"sourceText","다시 수정","note","종료 후 수정 시도"))))
+            .andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM source_revision WHERE case_id=?",Long.class,caseId)).isEqualTo(2);
+    }
     String proofUrl(){return "/api/v1/recalls/"+caseId+"/tasks/"+taskId+"/proofs";}
     MockMultipartHttpServletRequestBuilder request(String name,byte[] bytes) throws Exception {
         var req=multipart(proofUrl()).file(new MockMultipartFile("metadata","","application/json",json.writeValueAsBytes(Map.of("expectedVersion",1,"evidenceText","합성 이미지 근거"))));

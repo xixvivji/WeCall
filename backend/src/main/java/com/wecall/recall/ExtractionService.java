@@ -27,8 +27,8 @@ public class ExtractionService {
     @Transactional public Map<String,Object> enqueue(UUID caseId,String actor) {
         guard.requireOpen(caseId);
         require(jdbc.queryForObject("SELECT count(*) FROM extraction_job WHERE case_id=? AND status IN ('QUEUED','RUNNING')",Long.class,caseId)==0,"이 사건에 진행 중인 분석이 있습니다");
-        String source=recalls.getCase(caseId).get("sourceText").toString(); UUID id=UUID.randomUUID();
-        jdbc.update("INSERT INTO extraction_job(id,case_id,requested_by,source_text,source_sha256) VALUES (?,?,?,?,?)",id,caseId,actor,source,sha(source));
+        var recall=recalls.getCase(caseId); String source=recall.get("sourceText").toString(); UUID id=UUID.randomUUID();
+        jdbc.update("INSERT INTO extraction_job(id,case_id,requested_by,source_text,source_sha256,source_version) VALUES (?,?,?,?,?,?)",id,caseId,actor,source,sha(source),recall.get("sourceVersion"));
         return get(caseId,id);
     }
     public Map<String,Object> get(UUID caseId,UUID id) {return response(job(caseId,id,false));}
@@ -40,6 +40,7 @@ public class ExtractionService {
         var result=new LinkedHashMap<String,Object>();
         for(String key:List.of("id","status"))result.put(key,row.get(key));
         result.put("caseId",row.get("case_id"));result.put("requestedBy",row.get("requested_by"));result.put("sourceText",row.get("source_text"));result.put("sourceSha256",row.get("source_sha256"));
+        result.put("sourceVersion",row.get("source_version"));
         result.put("reviewStatus",row.get("review_status"));result.put("errorCode",row.get("error_code"));result.put("durationMs",row.get("duration_ms"));
         result.put("rawResponse",row.get("raw_response"));result.put("conditionId",row.get("condition_id"));
         for(var entry:Map.of("createdAt","created_at","startedAt","started_at","finishedAt","finished_at","reviewedAt","reviewed_at").entrySet())
@@ -66,6 +67,7 @@ public class ExtractionService {
     @Transactional public Map<String,Object> convert(UUID caseId,UUID id,Conversion body,String reviewer) {
         guard.requireOpen(caseId);var row=job(caseId,id,true);
         require(row.get("status").equals("SUCCEEDED") && row.get("review_status").equals("PENDING"),"성공한 미검토 분석만 조건 초안으로 전환할 수 있습니다");
+        require(((Number)row.get("source_version")).longValue()==((Number)recalls.getCase(caseId).get("sourceVersion")).longValue(),"원문이 수정된 분석입니다. 기각 후 현재 원문으로 다시 분석하세요");
         var condition=recalls.createCondition(caseId,body.definition());
         jdbc.update("UPDATE extraction_job SET review_status='ACCEPTED',condition_id=?,reviewed_by=?,review_note=?,reviewed_at=now() WHERE id=?",condition.get("id"),reviewer,body.note(),id);
         return get(caseId,id);

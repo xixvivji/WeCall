@@ -17,11 +17,17 @@ public class SourcePdfController {
     private final MalwareScanner scanner;
     private final Semaphore slots = new Semaphore(2);
     public SourcePdfController(MalwareScanner scanner) { this.scanner = scanner; }
-    public record Preview(String text, int pages, String scanStatus) {}
+    public record Preview(String text, int pages, String scanStatus, String sha256) {}
+    public record Parsed(byte[] bytes, String text, int pages, MalwareScanner.Receipt scan) {}
     private RecallService.Failure fail(HttpStatus status, String message) { return new RecallService.Failure(status, message); }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Preview> extract(@RequestPart("file") MultipartFile file) {
+        var parsed = parse(file);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new Preview(parsed.text(), parsed.pages(), parsed.scan().status(), com.wecall.attachment.AttachmentService.hash(parsed.bytes())));
+    }
+
+    public Parsed parse(MultipartFile file) {
         if (!slots.tryAcquire()) throw fail(HttpStatus.SERVICE_UNAVAILABLE, "PDF 추출 중입니다. 잠시 후 다시 시도하세요");
         try {
             if (file.getSize() > 10485760) throw fail(HttpStatus.PAYLOAD_TOO_LARGE, "PDF는 10 MiB 이하여야 합니다");
@@ -50,7 +56,7 @@ public class SourcePdfController {
                 stripper.writeText(document, writer);
                 String text = writer.toString().strip();
                 if (text.isBlank()) throw fail(HttpStatus.UNPROCESSABLE_ENTITY, "추출할 텍스트가 없습니다. 스캔 PDF의 OCR은 아직 지원하지 않으므로 원문을 직접 입력하세요");
-                return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new Preview(text, pages, scan.status()));
+                return new Parsed(bytes, text, pages, scan);
             }
         } catch (IOException | IllegalArgumentException e) {
             throw fail(HttpStatus.BAD_REQUEST, "PDF를 읽을 수 없습니다. 손상되거나 암호화된 파일인지 확인하세요");

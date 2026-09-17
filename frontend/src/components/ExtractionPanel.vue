@@ -6,6 +6,7 @@ import ConditionForm from "./ConditionForm.vue";
 interface Job {
   id: string;
   sourceText: string;
+  sourceVersion?: number;
   status: string;
   reviewStatus: string;
   errorCode: string | null;
@@ -20,7 +21,11 @@ interface Job {
     warnings: string[];
   } | null;
 }
-const props = defineProps<{ caseId: string; closed: boolean }>();
+const props = defineProps<{
+  caseId: string;
+  closed: boolean;
+  sourceVersion: number;
+}>();
 const emit = defineEmits<{ updated: [] }>();
 const rows = ref<Job[]>([]),
   selectedId = ref(""),
@@ -32,6 +37,11 @@ const rows = ref<Job[]>([]),
 const reviewer = computed(() => user.value?.roles.includes("REVIEWER"));
 const selected = computed(() =>
   rows.value.find((r) => r.id === selectedId.value),
+);
+const stale = computed(
+  () =>
+    selected.value?.sourceVersion !== undefined &&
+    selected.value.sourceVersion !== props.sourceVersion,
 );
 const running = computed(() =>
   rows.value.some((r) => ["QUEUED", "RUNNING"].includes(r.status)),
@@ -208,6 +218,10 @@ onUnmounted(() => {
         <summary>분석에 사용한 원문 확인</summary>
         <p class="prewrap">{{ selected.sourceText }}</p>
       </details>
+      <p v-if="stale" class="note">
+        이 분석은 이전 원문 v{{ selected.sourceVersion }} 기준입니다. 현재 원문
+        v{{ sourceVersion }}으로 다시 분석하세요. 기존 기록은 유지됩니다.
+      </p>
       <template v-if="selected.output">
         <p class="small muted">
           {{ selected.output.mode === "MOCK" ? "모의 응답" : "실제 모델 응답" }}
@@ -244,11 +258,15 @@ onUnmounted(() => {
           ['SUCCEEDED', 'FAILED'].includes(selected.status)
         "
       >
-        <button v-if="selected.output" :disabled="busy" @click="toggleEditing">
+        <button
+          v-if="selected.output && !stale"
+          :disabled="busy"
+          @click="toggleEditing"
+        >
           {{ editing ? "검토 작성 닫기" : "조건과 상품 연결 검토" }}
         </button>
         <ConditionForm
-          v-if="editing && selected.output"
+          v-if="editing && selected.output && !stale"
           :key="selected.id"
           :case-id="caseId"
           :extraction="{

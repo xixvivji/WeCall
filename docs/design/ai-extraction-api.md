@@ -61,3 +61,7 @@ Response extract(UUID requestId, String source, String sha);
 ## 로컬 모델 추가 이력
 
 위 인터페이스 분리 당시에는 fixture만 있었다. 현재는 `ollama-local`을 명시적으로 활성화할 수 있으며, 로컬 목적지·모델 확인·원문 근거 검증을 추가했다. 기본 disabled와 별도 조건 승인 원칙은 유지한다. 자세한 제한과 최신 검증은 [로컬 AI 문서](local-ai.md)를 따른다.
+
+## 원문 버전 변경
+
+원문 보관·수정 이력 도입 후 분석 작업에는 `sourceVersion`을 함께 저장한다. 현재 사건 버전과 다르면 조건 전환을 409로 거부하며, 과거 분석 자체는 보존한다. 원문 수정 및 원본 다운로드는 [원문 이력 API](source-pdf.md)를 참고한다.

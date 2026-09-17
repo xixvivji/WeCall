@@ -166,6 +166,7 @@ export interface CaseRow {
   openTaskCount: number;
 }
 export interface CaseDetail extends CaseRow {
+  sourceVersion: number;
   sourceText: string;
   lifecycleVersion: number;
   conditions: { id: string; version: number; status: string }[];
@@ -301,10 +302,23 @@ export async function downloadAttachment(
   id: string,
   filename: string,
 ) {
-  const response = await fetch(
+  return downloadFile(
     `/api/v1/recalls/${encodeURIComponent(caseId)}/attachments/${encodeURIComponent(id)}/download`,
-    { credentials: "same-origin" },
+    filename,
   );
+}
+export async function downloadSource(
+  caseId: string,
+  id: string,
+  filename: string,
+) {
+  return downloadFile(
+    `/api/v1/recalls/${encodeURIComponent(caseId)}/source/documents/${encodeURIComponent(id)}/download`,
+    filename,
+  );
+}
+async function downloadFile(path: string, filename: string) {
+  const response = await fetch(path, { credentials: "same-origin" });
   if (!response.ok) {
     if (response.status === 401) {
       user.value = null;
