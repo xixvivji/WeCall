@@ -42,6 +42,16 @@ class AttachmentTests {
         taskId=(UUID)tasks.create(caseId,new TaskModels.NewTask(TaskModels.TaskType.QUARANTINE,TaskModels.TargetType.CASE,null,null,"첨부 작업","합성 작업","operator","reviewer")).get("id");
         tasks.transition(caseId,taskId,new TaskModels.Transition(0L,TaskModels.Action.START,"reviewer","시작"));
     }
+    @Test void sourcePdfRequiresReviewerAndCsrf() throws Exception {
+        byte[] pdf=SourcePdfTests.pdf("Recall A01",1);
+        mvc.perform(multipart("/api/v1/source-pdf").file(new MockMultipartFile("file","source.pdf","application/pdf",pdf)).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.text").value("Recall A01"));
+        mvc.perform(multipart("/api/v1/source-pdf").file(new MockMultipartFile("file","source.pdf","application/pdf",pdf)).with(csrf()).with(user("operator").roles("OPERATOR")))
+            .andExpect(status().isForbidden());
+        mvc.perform(multipart("/api/v1/source-pdf").file(new MockMultipartFile("file","source.pdf","application/pdf",pdf)))
+            .andExpect(status().isForbidden());
+        assertThat(diskCount()).isZero();
+    }
     String proofUrl(){return "/api/v1/recalls/"+caseId+"/tasks/"+taskId+"/proofs";}
     MockMultipartHttpServletRequestBuilder request(String name,byte[] bytes) throws Exception {
         var req=multipart(proofUrl()).file(new MockMultipartFile("metadata","","application/json",json.writeValueAsBytes(Map.of("expectedVersion",1,"evidenceText","합성 이미지 근거"))));

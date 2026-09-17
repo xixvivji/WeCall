@@ -27,17 +27,59 @@ const router = useRouter(),
 const title = ref(""),
   source = ref("SUPPLIER"),
   text = ref("");
+const usedPdf = ref(false);
+const extracting = ref(false),
+  pdfPreview = ref<{ text: string; pages: number; scanStatus: string }>(),
+  pdfError = ref("");
+async function extractPdf(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || extracting.value) return;
+  pdfPreview.value = undefined;
+  pdfError.value = "";
+  if (file.size > 10485760) {
+    pdfError.value = "PDF는 10 MiB 이하여야 합니다";
+    return;
+  }
+  extracting.value = true;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    pdfPreview.value = await api("/api/v1/source-pdf", form);
+  } catch (e) {
+    pdfError.value = errorText(e);
+  } finally {
+    extracting.value = false;
+  }
+}
+function applyPdf() {
+  if (!pdfPreview.value) return;
+  if (
+    text.value &&
+    !window.confirm("입력한 원문을 PDF 추출 내용으로 바꿀까요?")
+  )
+    return;
+  text.value = pdfPreview.value.text;
+  usedPdf.value = true;
+  pdfPreview.value = undefined;
+}
 const draft = useDraftGuard(() => ({
   title: title.value,
   source: source.value,
   text: text.value,
+  pdfPreview: pdfPreview.value?.text,
 }));
 function toggleCreate() {
+  if (extracting.value || saving.value) return;
   if (creating.value && !draft.discard()) return;
   if (creating.value) {
     title.value = "";
     source.value = "SUPPLIER";
     text.value = "";
+    usedPdf.value = false;
+    pdfPreview.value = undefined;
+    pdfError.value = "";
     draft.saved();
   }
   creating.value = !creating.value;
@@ -68,7 +110,7 @@ async function load(reset = false) {
   }
 }
 async function create() {
-  if (saving.value) return;
+  if (saving.value || extracting.value || pdfPreview.value) return;
   saving.value = true;
   createError.value = "";
   try {
@@ -78,7 +120,9 @@ async function create() {
       sourceText: text.value,
     });
     draft.saved();
-    await router.push("/recalls/" + result.id);
+    await router.push(
+      "/recalls/" + result.id + (usedPdf.value ? "?tab=ai" : ""),
+    );
   } catch (e) {
     createError.value = errorText(e);
   } finally {
@@ -136,6 +180,48 @@ onUnmounted(() => {
         >
       </div>
       <label
+        >텍스트 PDF에서 가져오기
+        <input
+          type="file"
+          accept="application/pdf,.pdf"
+          :disabled="extracting || saving"
+          @change="extractPdf"
+        />
+      </label>
+      <p class="muted">
+        최대 10 MiB·50쪽. 로컬 서버에서 텍스트를 추출합니다. PDF 원본은 보관하지
+        않으며, 확인한 텍스트만 사건에 저장합니다. 스캔 PDF의 OCR은 아직
+        지원하지 않습니다.
+      </p>
+      <p v-if="extracting" role="status">PDF 원문을 추출하고 있습니다…</p>
+      <p v-if="pdfError" class="error" role="alert">{{ pdfError }}</p>
+      <div v-if="pdfPreview" class="panel">
+        <h3>PDF 추출 미리보기 · {{ pdfPreview.pages }}쪽</h3>
+        <p>
+          표·줄바꿈·읽기 순서가 달라질 수 있습니다. PDF와 대조하고 적용 후
+          원문을 수정하세요.
+        </p>
+        <p>
+          {{
+            pdfPreview.scanStatus === "CLEAN"
+              ? "악성 파일 검사 통과"
+              : "악성 파일 검사 미실행"
+          }}
+        </p>
+        <textarea
+          aria-label="PDF 추출 미리보기"
+          :value="pdfPreview.text"
+          readonly
+          rows="8"
+        />
+        <button type="button" @click="applyPdf">
+          추출 내용으로 원문 채우기
+        </button>
+        <button type="button" @click="pdfPreview = undefined">
+          미리보기 버리기
+        </button>
+      </div>
+      <label
         >회수 원문<textarea
           v-model="text"
           required
@@ -144,8 +230,15 @@ onUnmounted(() => {
           placeholder="회수 요청 원문을 그대로 붙여 넣으세요"
         />
       </label>
+      <p class="muted">
+        원문을 확인·수정한 뒤 등록하세요. 현재 로컬 AI는 6,000바이트·80줄까지
+        분석하며, 초과 시 자동으로 자르지 않습니다.
+      </p>
       <div class="form-actions">
-        <button class="primary" :disabled="saving">
+        <button
+          class="primary"
+          :disabled="saving || extracting || !!pdfPreview"
+        >
           {{ saving ? "등록 중…" : "사건 등록" }}
         </button>
       </div>
