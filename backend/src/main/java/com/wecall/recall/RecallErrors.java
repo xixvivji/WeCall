@@ -6,12 +6,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
-@RestControllerAdvice(assignableTypes = {CaseReportController.class,CaseHistoryController.class,com.wecall.attachment.AttachmentController.class,AssessmentExportController.class, WorkspaceController.class, RecallController.class, EvidenceController.class, TaskController.class, ClosureController.class, ExtractionController.class, com.wecall.auth.AuthController.class})
+@RestControllerAdvice(assignableTypes = {SourcePdfController.class,CaseReportController.class,CaseHistoryController.class,com.wecall.attachment.AttachmentController.class,AssessmentExportController.class, WorkspaceController.class, RecallController.class, EvidenceController.class, TaskController.class, ClosureController.class, ExtractionController.class, com.wecall.auth.AuthController.class})
 class RecallErrors {
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     ResponseEntity<?> attachmentTooLarge(Exception e){return ResponseEntity.status(413).body(Map.of("code","UPLOAD_TOO_LARGE","message","첨부 파일당 10 MiB, 요청당 52 MiB 제한입니다"));}
     @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
-    ResponseEntity<?> missingPart(Exception e){return ResponseEntity.badRequest().body(Map.of("code","INVALID_REQUEST","message","metadata JSON과 files 첨부가 필요합니다"));}
+    ResponseEntity<?> missingPart(Exception e){return ResponseEntity.badRequest().body(Map.of("code","INVALID_REQUEST","message","요청에 필요한 파일 또는 metadata 항목이 없습니다"));}
     @ExceptionHandler(ClosureService.Blocked.class)
     ResponseEntity<?> closureBlocked(ClosureService.Blocked e) {
         return ResponseEntity.status(409).body(Map.of("code","CLOSURE_BLOCKED","message",e.getMessage(),"check",e.check));
