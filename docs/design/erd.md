@@ -1,6 +1,6 @@
 # 구현 ERD와 데이터 사전
 
-기준: 2026-09-14, 첨부 검사 V11 반영. [Flyway V1~V11](../../backend/src/main/resources/db/migration/)의 실제 20개 테이블을 기준으로 한다. 단일 기업 모델이며 아래 선은 DB FK 관계다. 복합 FK의 정확한 컬럼은 데이터 사전·SQL을 따른다.
+기준: 2026-09-17, 원문 보관·이력 V12 반영. [Flyway V1~V12](../../backend/src/main/resources/db/migration/)의 실제 23개 테이블을 기준으로 한다. 단일 기업 모델이며 아래 선은 DB FK 관계다. 복합 FK의 정확한 컬럼은 데이터 사전·SQL을 따른다.
 
 ## 입력 데이터
 
@@ -53,7 +53,7 @@ erDiagram
 
 | 테이블 | 주요 구조 | 제약·상태 |
 | --- | --- | --- |
-| recall_case | id UUID PK; title, source_type, source_text, created_at, status, lifecycle_version, closed_at | 출처 SUPPLIER/OFFICIAL/INTERNAL; OPEN/CLOSED와 closed_at 일관성 |
+| recall_case | id UUID PK; title, source_type, source_text, source_version, created_at, status, lifecycle_version, closed_at | 출처 SUPPLIER/OFFICIAL/INTERNAL; OPEN/CLOSED와 closed_at 일관성 |
 | recall_condition | id PK; case_id FK, dataset_id FK, version, definition JSONB, status, approved_by/at | (case_id,version) 유일; DRAFT/APPROVED와 승인 정보 일관성 |
 | assessment_run | id PK; case_id, condition_id, dataset_id, result JSONB, created_at | (condition_id,case_id,dataset_id)로 조건 FK; id+사건 및 id+사건+데이터 복합 유일키 |
 | receipt_evidence | id PK; case_id; base_assessment_id/base_dataset_id/receipt_id; document_text/hash; proposal JSONB; status; 검토자·사유·시각; result_dataset_id/result_assessment_id | 사건·기준 판정·기준 입고 FK; 결과 판정의 사건/데이터 일치; 결과 데이터·판정 각각 유일; PENDING/APPROVED/REJECTED |
@@ -61,7 +61,7 @@ erDiagram
 | response_task_proof | id PK; task_id FK; review_round; evidence_text/hash; submitted_by/at; status; reviewed_by/note/at | 회차 >0; PENDING/ACCEPTED/REJECTED와 검토 정보 일관성 |
 | response_task_event | id PK; task_id FK; version, event_type, actor, details JSONB, created_at | (task_id,version) 유일 |
 | case_lifecycle_event | id PK; case_id FK; version, event_type, assessment_id nullable, reviewer, note, snapshot JSONB, created_at | (case_id,version) 유일; CLOSED/REOPENED; CLOSED는 판정 필수; 판정+사건 FK |
-| extraction_job | id PK; case_id FK; requested_by; source_text/hash; status, review_status; response JSONB/raw_response; error_code, duration_ms, 시각; reviewed_by/note/at; condition_id nullable FK | QUEUED/RUNNING/SUCCEEDED/FAILED; PENDING/ACCEPTED/DISMISSED; 진행 작업 사건별 하나인 부분 유일 인덱스 |
+| extraction_job | id PK; case_id FK; requested_by; source_text/hash, source_version; status, review_status; response JSONB/raw_response; error_code, duration_ms, 시각; reviewed_by/note/at; condition_id nullable FK | QUEUED/RUNNING/SUCCEEDED/FAILED; PENDING/ACCEPTED/DISMISSED; 진행 작업 사건별 하나인 부분 유일 인덱스 |
 
 현재 상품 연결 검토는 `recall_condition.definition` 안에 productReviews·원문 인용·조건 트리로 보존한다. 개별 입고 판정 및 재고·출고 영향은 `assessment_run.result` 안에 저장한다. PRODUCT_MATCH·DECISION·RECEIPT_CORRECTION이라는 별도 테이블은 없다. 모델·프롬프트 정보는 추출 응답 계약 내 값이며 별도 모델 테이블은 없다.
 
@@ -80,7 +80,7 @@ assignee, 승인자·등록자·이력 actor 등 사용자 문자열에는 DB �
 
 대상 판정·상품 연결·조치 상태는 독립이다. 승인 조건과 판정 결과는 애플리케이션 경로에서 덮어쓰지 않으며 증거 보완은 새 버전을 만든다. DB 관리자까지 차단하는 WORM 저장소나 전 테이블 수정 방지 트리거가 있다는 의미는 아니다. 세션 테이블·범용 감사 로그 테이블·기업 tenant 테이블은 현재 없다.
 
-새 기능에서 스키마를 바꾸면 마이그레이션과 이 문서를 같은 작업에서 갱신한다. 파일 관련 테이블과 관계는 아래 V10 항목을 따른다.
+새 기능에서 스키마를 바꾸면 마이그레이션과 이 문서를 같은 작업에서 갱신한다. 파일 관련 테이블과 관계는 아래 V10~V12 항목을 따른다.
 
 
 ## V10 파일 첨부
@@ -104,3 +104,23 @@ erDiagram
 ## V11 첨부 검사 메타데이터
 
 evidence_attachment에 scan_status(NOT_SCANNED/CLEAN), scan_engine, scanned_at을 추가한다. CLEAN은 업로드 당시 엔진과 검사 시각이 있어야 하며, 과거 파일은 NOT_SCANNED로 이관한다. 새 테이블은 없다. 다운로드는 설정된 현재 엔진으로 다시 검사하며 업로드 메타데이터를 덮어쓰지 않는다.
+
+
+## V12 PDF 원본·원문 수정 이력
+
+```mermaid
+erDiagram
+    recall_case ||--o| source_document : original_pdf
+    source_document ||--o{ source_document_event : access_history
+    recall_case ||--o{ source_revision : text_versions
+```
+
+| 테이블 | 키와 주요 컬럼 | DB 제약·의미 |
+| --- | --- | --- |
+| source_document | id UUID PK; case_id 유일 FK; filename, byte_size, sha256, extracted_text, pages, uploaded_by, scan_status/engine/scanned_at, created_at | 사건당 원본 PDF 최대 1개; 1바이트~10 MiB·1~50쪽; 실제 바이트는 로컬 저장소 |
+| source_document_event | id UUID PK; document_id FK; event_type, actor, created_at | UPLOADED/DOWNLOAD_REQUESTED; 전송 완료를 뜻하지 않음 |
+| source_revision | (case_id,version) PK; source_text, actor nullable, note, created_at | case_id FK; 원문 버전 >0, 텍스트 1~100,000자; 기존 사건의 등록자 미상은 null |
+
+recall_case.source_version은 현재 원문 버전이며 extraction_job.source_version은 요청 당시 버전이다. 둘 다 양수 CHECK가 있고 원문 수정·AI 전환의 버전 일치는 서비스 트랜잭션에서 검사한다. source_revision과 연결하는 복합 FK가 구현돼 있다는 뜻은 아니다. 조건 테이블에는 현재 원문 버전 컬럼이 없다. 기존 승인 조건의 원문 재검토 관리는 [후속 제안](product-roadmap.md)이다.
+
+등록 트랜잭션은 PDF 원본·서버 추출본·검토 원문 v1을 함께 보존한다. 수정은 source_revision에 추가하고 recall_case의 현재 원문을 갱신한다. 기존 사건은 원문 v1로 이전하며 과거 원본 PDF나 등록자를 추정해서 채우지 않는다. [상세 API](source-pdf.md)
