@@ -152,6 +152,11 @@ watch(() => [props.caseId, props.assessmentId], load, { immediate: true });
         다시 조회하면 업무 현황이 변경될 수 있습니다.
       </p>
       <h2>1. 사건 개요</h2>
+      <p class="small">
+        현재 원문 버전: {{ report.case.sourceVersion ?? "기록 없음" }}. 아래
+        원문은 보고서 조회 시점 기준이며, 과거 판정 당시 원문과 다를 수
+        있습니다.
+      </p>
       <p class="prewrap">{{ report.case.sourceText }}</p>
       <h2>2. 기준 판정과 승인 조건</h2>
       <template v-if="report.assessment && report.condition">

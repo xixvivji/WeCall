@@ -279,6 +279,10 @@ onMounted(async () => {
       <div class="two-col">
         <section class="panel">
           <h2>회수 요청 원문</h2>
+          <p class="muted">
+            현재 원문 v{{ recall.sourceVersion }} · 이전 원문은 원본·수정 이력
+            탭에서 확인하세요.
+          </p>
           <div class="prewrap">{{ recall.sourceText }}</div>
         </section>
         <section class="panel">
