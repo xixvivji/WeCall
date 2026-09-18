@@ -78,6 +78,70 @@ class CaseClosureTests {
     Set<String> blockers(Map<String,Object> check) {
         Set<String> codes=new HashSet<>(); for (var issue:(List<?>)check.get("blockers")) codes.add(((ClosureModels.Issue)issue).code()); return codes;
     }
+    void reviseSource(long version,String source) throws Exception {
+        postJson(prefix()+"/source/revisions",Map.of("expectedVersion",version,"sourceText",source,"note","합성 원문 정정"),201);
+    }
+    String sourceReviewUrl(UUID condition) {return prefix()+"/conditions/"+condition+"/source-review";}
+    Map<String,Object> unchanged(long version) {return Map.of("expectedSourceVersion",version,"note","현재 원문·조건·상품 연결 영향 없음 확인","unchangedConfirmed",true);}
+    @Test void changedSourceBlocksAssessmentAndClosureUntilExplicitReviewWithoutRewritingOldRun() throws Exception {
+        finishTask();
+        String original=recalls.getCase(caseId).get("sourceText").toString();
+        reviseSource(1,original+"\n연락처 정정");
+        assertThat(blockers(closures.check(caseId,run.id()))).contains("SOURCE_REVIEW_REQUIRED");
+        postJson(prefix()+"/assessments",new NewAssessment(run.conditionId()),409);
+        postJson(prefix()+"/closure",closeBody(0),409);
+        mvc.perform(get("/api/v1/workspace/reviews?kind=SOURCE")).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(get("/api/v1/workspace/summary")).andExpect(status().isOk()).andExpect(jsonPath("$.sourceReviewCases").value(1));
+        postJson(sourceReviewUrl(run.conditionId()),unchanged(1),409);
+        postJson(sourceReviewUrl(run.conditionId()),unchanged(2),200);
+        postJson(sourceReviewUrl(run.conditionId()),unchanged(2),409);
+        assertThat(recalls.getAssessment(caseId,run.id())).isEqualTo(run);
+        mvc.perform(get("/api/v1/workspace/reviews?kind=SOURCE")).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        var closed=postJson(prefix()+"/closure",closeBody(0),200);
+        var snapshot=closed.get("history").get(0).get("snapshot").get("check");
+        assertThat(snapshot.get("sourceVersion").asInt()).isEqualTo(2);
+        assertThat(snapshot.get("assessmentSourceVersion").asInt()).isEqualTo(1);
+        assertThat(snapshot.get("assessmentConditionSource").get("reviews").get(0).get("reviewer").asText()).isEqualTo("test-reviewer");
+        postJson(sourceReviewUrl(run.conditionId()),unchanged(2),409);
+        mvc.perform(get(prefix()+"/history?kind=CONDITION")).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+    }
+    @Test void restoredTextStillNeedsNewVersionReviewAndMissingCitationCannotBeAcknowledged() throws Exception {
+        String original=recalls.getCase(caseId).get("sourceText").toString();
+        reviseSource(1,original+"\n정정 메모");postJson(sourceReviewUrl(run.conditionId()),unchanged(2),200);
+        reviseSource(2,original);
+        assertThat(blockers(closures.check(caseId,run.id()))).contains("SOURCE_REVIEW_REQUIRED");
+        reviseSource(3,"모든 내용이 바뀐 합성 공문");
+        postJson(sourceReviewUrl(run.conditionId()),unchanged(4),409);
+        mvc.perform(post(sourceReviewUrl(run.conditionId())).with(csrf()).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("test-operator").roles("OPERATOR"))
+            .contentType("application/json").content(json.writeValueAsBytes(unchanged(4)))).andExpect(status().isForbidden());
+        postJson(sourceReviewUrl(UUID.randomUUID()),unchanged(4),404);
+    }
+    @Test void staleDraftCanBeWithdrawnAndReplacementConditionClearsSourceBlocker() throws Exception {
+        UUID draft=(UUID)recalls.createCondition(caseId,definition).get("id");
+        String original=recalls.getCase(caseId).get("sourceText").toString();
+        reviseSource(1,original+"\n조건 재검토");
+        postJson(prefix()+"/conditions/"+draft+"/approval",Map.of(),409);
+        postJson(prefix()+"/conditions/"+draft+"/withdrawal",Map.of("expectedSourceVersion",1,"note","이전 초안 철회"),409);
+        postJson(prefix()+"/conditions/"+draft+"/withdrawal",Map.of("expectedSourceVersion",2,"note","새 조건으로 대체"),200);
+        postJson(prefix()+"/conditions/"+draft+"/approval",Map.of(),409);
+        postJson(prefix()+"/assessments",new NewAssessment(draft),409);
+        postJson(prefix()+"/conditions/"+run.conditionId()+"/withdrawal",Map.of("expectedSourceVersion",2,"note","승인 조건 철회 시도"),409);
+        var replacement=postJson(prefix()+"/conditions",definition,201);
+        UUID id=UUID.fromString(replacement.get("id").asText());
+        postJson(prefix()+"/conditions/"+id+"/approval",Map.of(),200);
+        var next=postJson(prefix()+"/assessments",new NewAssessment(id),201);
+        var check=closures.check(caseId,UUID.fromString(next.get("id").asText()));
+        assertThat(blockers(check)).doesNotContain("SOURCE_REVIEW_REQUIRED","PENDING_CONDITIONS","OUTDATED_ASSESSMENT");
+        assertThat(recalls.getAssessment(caseId,run.id())).isEqualTo(run);
+    }
+    @Test void unknownLegacyBasisRequiresReviewInsteadOfAssumingCurrentVersion() throws Exception {
+        jdbc.update("UPDATE recall_condition SET source_version=NULL WHERE id=?",run.conditionId());
+        var state=(Map<?,?>)recalls.getCondition(caseId,run.conditionId()).get("sourceReview");
+        assertThat(state.get("basisVersion")).isNull();assertThat(state.get("required")).isEqualTo(true);
+        postJson(sourceReviewUrl(run.conditionId()),unchanged(1),200);
+        assertThat(jdbc.queryForObject("SELECT source_version FROM recall_condition WHERE id=?",Long.class,run.conditionId())).isNull();
+        postJson(prefix()+"/assessments",new NewAssessment(run.conditionId()),201);
+    }
     @Test void closesAndReopensWhileKeepingApprovalSnapshot() throws Exception {
         finishTask(); var check=closures.check(caseId,run.id()); assertThat(check.get("ready")).isEqualTo(true);
         var closed=postJson(prefix()+"/closure",closeBody(0),200);

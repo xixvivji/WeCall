@@ -65,6 +65,7 @@ onMounted(() => load());
         v-for="(title, key) in {
           openCases: '진행 중 사건',
           reviewCases: '확인 필요 사건',
+          sourceReviewCases: '원문 재검토 사건',
           unassessedCases: '미판정 사건',
           openTasks: '전체 미완료 작업',
           myTasks: '내 미완료 작업',

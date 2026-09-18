@@ -123,6 +123,7 @@ export const labels: Record<string, string> = {
   OPEN: "진행 중",
   CLOSED: "종료",
   DRAFT: "검토 대기",
+  WITHDRAWN: "초안 철회",
   APPROVED: "승인 완료",
   SUPPLIER: "공급사 요청",
   OFFICIAL: "공식 공고",
@@ -195,7 +196,21 @@ export interface Definition {
   rule: Rule;
   productReviews: Record<string, { status: string; reason: string }>;
 }
+export interface SourceReview {
+  basisVersion: number | null;
+  currentVersion: number;
+  required: boolean;
+  reviews: {
+    sourceVersion: number;
+    reviewer: string;
+    note: string;
+    createdAt: string;
+  }[];
+}
 export interface Condition {
+  sourceReview?: SourceReview;
+  withdrawnBy?: string | null;
+  withdrawalNote?: string | null;
   id: string;
   version: number;
   status: string;
@@ -204,6 +219,7 @@ export interface Condition {
   approvedAt: string | null;
 }
 export interface RunRow {
+  sourceVersion?: number | null;
   id: string;
   conditionId: string;
   datasetId: string;

@@ -41,6 +41,7 @@ async function load() {
   }
 }
 const names: Record<string, [string, string]> = {
+  SOURCE_REVIEW_REQUIRED: ["원문 변경 영향 재검토", "overview"],
   UNREVIEWED_EXTRACTIONS: ["AI 분석 결과 검토", "ai"],
   NO_CONDITION: ["회수 조건 준비", "overview"],
   PENDING_CONDITIONS: ["조건 승인 검토", "overview"],

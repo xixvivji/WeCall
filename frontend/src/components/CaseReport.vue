@@ -34,6 +34,7 @@ interface Report {
   generatedAt: string;
   assessment: Assessment | null;
   condition: Condition | null;
+  assessmentSourceVersion?: number | null;
   assessmentCreatedAt: string | null;
   datasetAsOf: string | null;
   tasks: Task[];
@@ -160,6 +161,25 @@ watch(() => [props.caseId, props.assessmentId], load, { immediate: true });
       <p class="prewrap">{{ report.case.sourceText }}</p>
       <h2>2. 기준 판정과 승인 조건</h2>
       <template v-if="report.assessment && report.condition">
+        <p>
+          판정 생성 당시 원문 버전:
+          {{ report.assessmentSourceVersion ?? "기록 없음" }}. 현재 원문과의
+          조건 재검토:
+          {{
+            report.condition.sourceReview?.required
+              ? "필요"
+              : report.condition.sourceReview
+                ? "확인됨"
+                : "기록 없음"
+          }}.
+        </p>
+        <p
+          v-for="review in report.condition.sourceReview?.reviews || []"
+          :key="review.sourceVersion"
+        >
+          원문 v{{ review.sourceVersion }} 영향 없음 확인 ·
+          {{ review.reviewer }} · {{ review.note }}
+        </p>
         <p class="small">
           판정 ID: {{ report.assessment.id }}<br />판정 생성:
           {{ dateText(report.assessmentCreatedAt) }}<br />데이터 ID:

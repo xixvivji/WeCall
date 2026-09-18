@@ -51,6 +51,14 @@ class ReceiptEvidenceTests {
         recalls.approve(caseId,conditionId,new Approval("test-reviewer"));
         before=recalls.assess(caseId,conditionId);
     }
+    @Test void evidenceCannotCopyStaleConditionIntoCurrentSourceVersion() throws Exception {
+        var pending=postJson(prefix(),proposal(),201);
+        String original=recalls.getCase(caseId).get("sourceText").toString();
+        postJson("/api/v1/recalls/"+caseId+"/source/revisions",Map.of("expectedVersion",1,"sourceText",original+"\n문서 정정","note","수정"),201);
+        postJson(prefix()+"/"+pending.get("id").asText()+"/approval",Map.of("note","입고 검토","receiptAndSingleLotConfirmed",true),409);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM dataset",Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM recall_condition",Long.class)).isEqualTo(1);
+    }
     String prefix() { return "/api/v1/recalls/"+caseId+"/evidence"; }
     JsonNode postJson(String path,Object body,int expected) throws Exception {
         var response=mvc.perform(post(path).with(csrf()).contentType("application/json").content(json.writeValueAsBytes(body)))

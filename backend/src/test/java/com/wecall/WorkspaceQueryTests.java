@@ -44,7 +44,10 @@ class WorkspaceQueryTests {
         jdbc.update("UPDATE response_task SET review_round=2 WHERE id=?",task);
         mvc.perform(get("/api/v1/workspace/reviews?kind=PROOF")).andExpect(jsonPath("$.totalElements").value(0));
         jdbc.update("UPDATE recall_condition SET status='APPROVED',approved_by='검토자',approved_at=now() WHERE id=?",condition);
-        mvc.perform(get("/api/v1/workspace/reviews")).andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(get("/api/v1/workspace/reviews")).andExpect(jsonPath("$.totalElements").value(2)).andExpect(jsonPath("$.counts.SOURCE").value(1));
+        // This SQL fixture initially has unknown provenance; bind it explicitly to simulate a current-source condition.
+        jdbc.update("UPDATE recall_condition SET source_version=1 WHERE id=?",condition);
+        mvc.perform(get("/api/v1/workspace/reviews")).andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.counts.SOURCE").value(0));
         jdbc.update("UPDATE recall_case SET status='CLOSED',closed_at=now() WHERE id=?",first);
         mvc.perform(get("/api/v1/workspace/reviews")).andExpect(jsonPath("$.totalElements").value(0));
     }

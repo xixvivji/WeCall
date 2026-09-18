@@ -24,6 +24,15 @@ public class CaseHistoryController {
             NULL::uuid AS proof_id, NULL::text AS assignee
         FROM recall_condition c WHERE c.case_id=:caseId AND c.status='APPROVED'
         UNION ALL
+        SELECT 'source-review:' || v.condition_id || ':' || v.source_version,'CONDITION','CONDITION_SOURCE_REVIEWED',
+            v.created_at,v.reviewer,v.note,'조건 v' || c.version || ' · 원문 v' || v.source_version || ' 영향 없음 확인',c.version::bigint,
+            c.id,NULL::uuid,NULL::uuid,NULL::uuid,NULL::text
+        FROM condition_source_review v JOIN recall_condition c ON c.id=v.condition_id WHERE v.case_id=:caseId
+        UNION ALL
+        SELECT 'withdrawal:' || c.id,'CONDITION','CONDITION_WITHDRAWN',c.withdrawn_at,c.withdrawn_by,c.withdrawal_note,
+            '조건 v' || c.version || ' 초안 철회',c.version::bigint,c.id,NULL::uuid,NULL::uuid,NULL::uuid,NULL::text
+        FROM recall_condition c WHERE c.case_id=:caseId AND c.status='WITHDRAWN'
+        UNION ALL
         SELECT 'evidence:' || e.id, 'EVIDENCE', 'EVIDENCE_' || e.status,
             e.reviewed_at,e.reviewed_by,e.review_note,'입고 ' || e.receipt_id || ' 증거',NULL::bigint,
             NULL::uuid,e.id,NULL::uuid,NULL::uuid,NULL::text

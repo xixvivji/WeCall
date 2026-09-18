@@ -15,6 +15,7 @@ import {
   type Assessment,
   type Rule,
 } from "../api";
+import ConditionSourceReview from "../components/ConditionSourceReview.vue";
 import SourceHistory from "../components/SourceHistory.vue";
 import ExtractionPanel from "../components/ExtractionPanel.vue";
 import NextActions from "../components/NextActions.vue";
@@ -322,6 +323,12 @@ onMounted(async () => {
               }}</span>
             </div>
             <p>{{ ruleText(condition.definition.rule) }}</p>
+            <ConditionSourceReview
+              :case-id="id"
+              :condition="condition"
+              :closed="closed"
+              @updated="load"
+            />
             <details>
               <summary>근거와 상품 연결 확인</summary>
               <blockquote class="prewrap">
@@ -347,11 +354,19 @@ onMounted(async () => {
               ><button
                 v-if="condition.status === 'DRAFT'"
                 class="primary"
-                :disabled="busy || !confirm[condition.id]"
+                :disabled="
+                  busy ||
+                  !confirm[condition.id] ||
+                  condition.sourceReview?.required
+                "
                 @click="approve(condition)"
               >
                 조건 승인</button
-              ><button v-else :disabled="busy" @click="assess(condition)">
+              ><button
+                v-else-if="condition.status === 'APPROVED'"
+                :disabled="busy || condition.sourceReview?.required"
+                @click="assess(condition)"
+              >
                 이 조건으로 판정 실행
               </button></template
             >
@@ -374,7 +389,9 @@ onMounted(async () => {
               조건 v{{
                 conditions.find((c) => c.id === run.conditionId)?.version
               }}
-              · {{ dateText(run.createdAt) }} · {{ run.id.slice(0, 8) }}
+              · 원문
+              {{ run.sourceVersion ? "v" + run.sourceVersion : "기록 없음" }} ·
+              {{ dateText(run.createdAt) }} · {{ run.id.slice(0, 8) }}
             </option>
           </select></label
         >
