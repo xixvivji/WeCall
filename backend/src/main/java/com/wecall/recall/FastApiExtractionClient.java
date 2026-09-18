@@ -22,16 +22,29 @@ public class FastApiExtractionClient implements ExtractionClient {
         var factory=new SimpleClientHttpRequestFactory();factory.setConnectTimeout(connectTimeout);factory.setReadTimeout(readTimeout);
         client=RestClient.builder().requestFactory(factory).build();
     }
+    // Read only documented codes; never relay arbitrary upstream messages or bodies.
+    private String errorCode(int status,String raw) {
+        try {
+            String code=json.readTree(raw).path("detail").path("code").asText();
+            if(status==422 && Set.of("LOCAL_SOURCE_TOO_LONG","MANUAL_REVIEW_REQUIRED","EMPTY_SOURCE","UNSUPPORTED_FIXTURE").contains(code))return code;
+            if(status==503 && Set.of("LOCAL_MODEL_BUSY","LOCAL_MODEL_UNAVAILABLE","NON_LOCAL_MODEL_BLOCKED","MODEL_NOT_CONFIGURED","SERVICE_NOT_CONFIGURED").contains(code))return code;
+            if(status==504 && code.equals("LOCAL_MODEL_TIMEOUT"))return "AI_TIMEOUT";
+            if(status==401 && code.equals("UNAUTHORIZED_SERVICE"))return "AI_SERVICE_AUTH_FAILED";
+            if(status==502 && Set.of("MODEL_RESPONSE_TOO_LARGE","INVALID_MODEL_OUTPUT","INCOMPLETE_MODEL_RESPONSE","INVALID_SOURCE_QUOTE").contains(code))return "INVALID_AI_RESPONSE";
+        } catch(Exception ignored) { /* Invalid error bodies stay generic. */ }
+        return status==422?"AI_REJECTED_INPUT":status==504?"AI_TIMEOUT":"AI_UNAVAILABLE";
+    }
     @Override
     public Response extract(UUID id,String source,String sha) {
         if(token.isBlank()) throw new Failed("SERVICE_NOT_CONFIGURED",null);
         try {
             return client.post().uri(base+"/v1/extractions").header("X-Service-Token",token)
                 .body(Map.of("requestId",id,"sourceText",source)).exchange((request,response)->{
+                    if(response.getStatusCode().value()==401 || response.getStatusCode().value()==403)throw new Failed("AI_SERVICE_AUTH_FAILED",null);
                     byte[] bytes=response.getBody().readNBytes(262145);
                     if(bytes.length>262144) throw new Failed("AI_RESPONSE_TOO_LARGE",null);
                     String raw=new String(bytes,StandardCharsets.UTF_8);
-                    if(!response.getStatusCode().is2xxSuccessful()) throw new Failed(response.getStatusCode().value()==422?"AI_REJECTED_INPUT":"AI_UNAVAILABLE",null);
+                    if(!response.getStatusCode().is2xxSuccessful()) throw new Failed(errorCode(response.getStatusCode().value(),raw),null);
                     try {
                         Result value=json.readValue(raw,Result.class);
                         if(value==null || !id.equals(value.requestId()) || !sha.equals(value.sourceSha256()) || !"v1".equals(value.schemaVersion())

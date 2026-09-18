@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AiInputStatus from "../components/AiInputStatus.vue";
 import BrandFlow from "../components/BrandFlow.vue";
 import { useDraftGuard } from "../drafts";
 import { onMounted, onUnmounted, ref } from "vue";
@@ -276,6 +277,7 @@ onUnmounted(() => {
           placeholder="회수 요청 원문을 그대로 붙여 넣으세요"
         />
       </label>
+      <AiInputStatus :text="text" />
       <p class="muted">
         원문을 확인·수정한 뒤 등록하세요. 현재 로컬 AI는 6,000바이트·80줄까지
         분석하며, 초과 시 자동으로 자르지 않습니다.

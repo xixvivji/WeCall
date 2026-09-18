@@ -140,3 +140,5 @@ API 키와 비밀번호는 Git에 올리지 않습니다. `.env` 파일은 Git�
 - [사건별 대응 결과 보고서·인쇄 안내](docs/design/case-report-api.md)
 
 - [백엔드 MVP 인수·프론트/AI 후속 작업](docs/validation/backend-handoff.md)
+
+개발·시연 범위의 완료 근거와 운영 전 남은 항목은 [MVP 마무리 기록](docs/validation/mvp-completion-2026-09-18.md)을 참고하세요.

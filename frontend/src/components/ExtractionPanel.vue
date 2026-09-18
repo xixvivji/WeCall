@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { api, user, errorText, type Rule } from "../api";
 import { confirmDrafts, useDraftGuard } from "../drafts";
+import AiInputStatus from "./AiInputStatus.vue";
+import { aiInput } from "../aiInput";
 import ConditionForm from "./ConditionForm.vue";
 interface Job {
   id: string;
@@ -25,6 +27,7 @@ const props = defineProps<{
   caseId: string;
   closed: boolean;
   sourceVersion: number;
+  sourceText: string;
 }>();
 const emit = defineEmits<{ updated: [] }>();
 const rows = ref<Job[]>([]),
@@ -34,6 +37,7 @@ const rows = ref<Job[]>([]),
   busy = ref(false),
   editing = ref(false),
   note = ref("");
+const inputSize = computed(() => aiInput(props.sourceText));
 const reviewer = computed(() => user.value?.roles.includes("REVIEWER"));
 const selected = computed(() =>
   rows.value.find((r) => r.id === selectedId.value),
@@ -60,15 +64,39 @@ const statusText: Record<string, string> = {
   DISMISSED: "기각",
 };
 const errors: Record<string, string> = {
-  AI_REJECTED_INPUT:
-    "명확한 조건을 추출하지 못했거나 로컬 입력 한도를 넘었습니다. 원문을 확인해 수동으로 조건을 작성하세요.",
-  AI_TIMEOUT:
-    "모델 응답 시간이 초과됐습니다. 실행 환경을 확인한 뒤 다시 요청하세요.",
+  LOCAL_SOURCE_TOO_LONG:
+    "AI 입력 한도를 초과했습니다. 원문을 보존하고 수동 조건 작성으로 진행하세요.",
+  MANUAL_REVIEW_REQUIRED:
+    "지원 범위를 벗어나거나 명확한 조건을 확인하지 못했습니다. 예외·상품별 조건을 포함한 전체 원문을 확인해 수동으로 작성하세요.",
+  EMPTY_SOURCE: "분석할 원문이 없습니다. 원문을 확인하세요.",
+  LOCAL_MODEL_BUSY:
+    "다른 문서를 분석 중입니다. 잠시 기다린 후 원문 분석 요청을 다시 눌러 주세요.",
+  LOCAL_MODEL_UNAVAILABLE:
+    "로컬 모델에 연결할 수 없습니다. 담당자에게 모델 실행·설치 상태 확인을 요청한 뒤 다시 분석하세요.",
   AI_UNAVAILABLE:
-    "로컬 모델이 준비되지 않았거나 응답 검증에 실패했습니다. 실행 상태를 확인하세요.",
-  SERVICE_NOT_CONFIGURED: "AI 서비스 연결 설정이 필요합니다.",
+    "AI 처리 서비스에 연결할 수 없거나 서비스 오류가 발생했습니다. 담당자에게 실행 상태 확인을 요청한 뒤 다시 분석하세요.",
+  AI_TIMEOUT:
+    "모델 응답 시간이 초과됐습니다. 잠시 후 다시 요청하거나 수동으로 조건을 작성하세요.",
   INVALID_AI_RESPONSE:
-    "검증할 수 없는 응답이므로 조건 초안에 사용하지 않았습니다.",
+    "응답의 형식·근거를 검증하지 못해 초안으로 사용하지 않았습니다. 다시 요청해도 반복되면 수동으로 조건을 작성하세요.",
+  AI_RESPONSE_TOO_LARGE:
+    "응답 크기가 허용 범위를 넘어서 사용하지 않았습니다. 수동으로 조건을 작성하고 담당자에게 문의하세요.",
+  NON_LOCAL_MODEL_BLOCKED:
+    "로컬 모델임을 확인할 수 없어 처리를 차단했습니다. 담당자에게 로컬 모델 설정 확인을 요청하세요. 외부 모델로 자동 전환하지 않습니다.",
+  MODEL_NOT_CONFIGURED:
+    "사용할 로컬 모델이 설정되지 않았습니다. 담당자에게 모델 설정을 요청하세요.",
+  SERVICE_NOT_CONFIGURED:
+    "AI 서비스 연결 설정이 필요합니다. 담당자에게 설정을 요청하세요.",
+  AI_SERVICE_AUTH_FAILED:
+    "AI 서비스 인증 설정을 확인해야 합니다. 담당자에게 문의하세요.",
+  MOCK_RESPONSE_DISABLED:
+    "모의 응답은 현재 환경에서 사용할 수 없습니다. 담당자에게 로컬 모델 연결 확인을 요청하세요.",
+  UNSUPPORTED_FIXTURE:
+    "개발용 모의 분석에서 지원하지 않는 원문입니다. 수동으로 조건을 작성하세요.",
+  WORKER_INTERRUPTED:
+    "서비스 재시작 등으로 분석이 중단됐습니다. 원문과 이전 기록은 유지됩니다. 다시 요청하세요.",
+  AI_REJECTED_INPUT:
+    "분석 서비스가 입력을 처리하지 못했습니다. 원문·입력 한도를 확인하고 수동으로 조건을 작성하세요.",
 };
 function describe(rule: Rule): string {
   if (rule.op === "AND" || rule.op === "OR")
@@ -114,7 +142,14 @@ function toggleEditing() {
   draft.saved();
 }
 async function request() {
-  if (busy.value || !confirmDrafts()) return;
+  if (
+    busy.value ||
+    running.value ||
+    inputSize.value.exceeded ||
+    inputSize.value.empty ||
+    !confirmDrafts()
+  )
+    return;
   busy.value = true;
   error.value = "";
   try {
@@ -165,7 +200,14 @@ onUnmounted(() => {
       <button
         v-if="reviewer && !closed"
         class="primary"
-        :disabled="busy || running || loading || !!error"
+        :disabled="
+          busy ||
+          running ||
+          loading ||
+          !!error ||
+          inputSize.exceeded ||
+          inputSize.empty
+        "
         @click="request"
       >
         원문 분석 요청
@@ -176,6 +218,16 @@ onUnmounted(() => {
       UTF-8 6,000바이트·80줄입니다. 상품 연결과 조건은 사람이 검토하며, 초안을
       저장한 뒤에도 별도 승인이 필요합니다.
     </p>
+    <AiInputStatus :text="sourceText" />
+    <div class="inline" v-if="reviewer && !closed">
+      <RouterLink :to="{ path: `/recalls/${caseId}`, query: { tab: 'source' } }"
+        >원문 확인·수정 →</RouterLink
+      >
+      <RouterLink
+        :to="{ path: `/recalls/${caseId}`, query: { tab: 'overview' } }"
+        >수동 조건 작성으로 이동 →</RouterLink
+      >
+    </div>
     <p v-if="error" class="error" role="alert">
       {{ error }}
       <button :disabled="busy" @click="load">분석 이력 다시 조회</button>
@@ -212,7 +264,7 @@ onUnmounted(() => {
           errors[selected.errorCode ?? ""] ??
           "분석에 실패했습니다. 원문과 실행 환경을 확인하세요."
         }}
-        ({{ selected.errorCode }})
+        원문과 기존 분석 기록은 유지됩니다.
       </p>
       <details>
         <summary>분석에 사용한 원문 확인</summary>
