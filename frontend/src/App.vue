@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BrandFlow from "./components/BrandFlow.vue";
 import { confirmDrafts } from "./drafts";
 import { onMounted, ref } from "vue";
 import {
@@ -58,11 +59,12 @@ async function signOut() {
   </div>
   <div v-else-if="!user" class="login-layout">
     <section class="login-intro">
+      <BrandFlow />
       <div class="wordmark">
         w<span>e</span>call<span class="brand-dot">.</span>
       </div>
       <p class="eyebrow">RECALL OPERATIONS</p>
-      <h1>확인하고,<br />추적하고,<br />끝까지 대응하세요.</h1>
+      <h1>확실한 근거로,<br />끝까지 연결되는<br />회수 대응.</h1>
       <p>
         회수 요청부터 조건 검토, 영향 확인과 대응 기록까지.<br />한곳에서
         이어지는 회수 업무.
@@ -108,7 +110,7 @@ async function signOut() {
       >
       <div class="workspace-name">회수 관리 워크스페이스</div>
       <p class="nav-label">업무</p>
-      <nav>
+      <nav aria-label="주요 메뉴">
         <RouterLink to="/"><ClipboardList :size="20" />회수 사건</RouterLink
         ><RouterLink to="/datasets"
           ><Database :size="20" />데이터 관리</RouterLink

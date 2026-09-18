@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BrandFlow from "../components/BrandFlow.vue";
 import { useDraftGuard } from "../drafts";
 import { onMounted, onUnmounted, ref } from "vue";
 import { Search, Plus, ArrowUpRight } from "@lucide/vue";
@@ -173,6 +174,18 @@ onUnmounted(() => {
 });
 </script>
 <template>
+  <section class="brand-hero" aria-label="회수 업무 안내">
+    <BrandFlow />
+    <div class="hero-copy">
+      <p class="eyebrow">CONNECTED RESPONSE, WECALL</p>
+      <h2>확인에서 대응까지.<br />모든 과정이 이어지도록.</h2>
+      <p>원문과 근거를 확인하고, 회수 대응을 한곳에서 관리하세요.</p>
+      <RouterLink to="/workspace" class="hero-link"
+        >업무 대시보드 열기 <ArrowUpRight :size="18"
+      /></RouterLink>
+    </div>
+    <span class="hero-index" aria-hidden="true">01 — RECALL OPERATIONS</span>
+  </section>
   <div class="page-heading">
     <div>
       <p class="eyebrow">RECALL CASES</p>
