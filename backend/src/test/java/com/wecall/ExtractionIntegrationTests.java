@@ -56,6 +56,11 @@ class ExtractionIntegrationTests {
                     if(mode.equals("WRONG_HASH"))body.put("sourceSha256","wrong");
                     if(mode.equals("BAD_RULE"))((ObjectNode)body.get("rule")).put("op","SQL");
                     if(mode.equals("BAD_QUOTE"))body.put("sourceQuote","없는 문장");
+                    if(mode.startsWith("FAIL:")) {
+                        var parts=mode.split(":",3);
+                        byte[] failure=WIRE.writeValueAsBytes(Map.of("detail",Map.of("code",parts[2],"message","private upstream body")));
+                        exchange.sendResponseHeaders(Integer.parseInt(parts[1]),failure.length);exchange.getResponseBody().write(failure);return;
+                    }
                     byte[] bytes=mode.equals("HUGE")?new byte[262145]:mode.equals("INVALID")?"not json".getBytes():WIRE.writeValueAsBytes(body);
                     exchange.getResponseHeaders().set("Content-Type","application/json");exchange.sendResponseHeaders(mode.equals("ERROR")?503:200,bytes.length);exchange.getResponseBody().write(bytes);
                 }catch(Exception ignored){}finally{exchange.close();}
@@ -125,6 +130,41 @@ class ExtractionIntegrationTests {
     @Test void errorAndTimeoutRemainReviewableFailures() {
         MODE.set("ERROR");UUID id=enqueue();poll();assertThat(jobs.get(caseId,id).get("errorCode")).isEqualTo("AI_UNAVAILABLE");
         MODE.set("SLOW");id=enqueue();poll();assertThat(jobs.get(caseId,id).get("errorCode")).isEqualTo("AI_TIMEOUT");
+    }
+    @Test void providerErrorsAreAllowlistedAndNeverRelayPrivateBodies() {
+        var cases=Map.ofEntries(
+            Map.entry("422:LOCAL_SOURCE_TOO_LONG","LOCAL_SOURCE_TOO_LONG"),
+            Map.entry("422:MANUAL_REVIEW_REQUIRED","MANUAL_REVIEW_REQUIRED"),
+            Map.entry("503:LOCAL_MODEL_BUSY","LOCAL_MODEL_BUSY"),
+            Map.entry("503:LOCAL_MODEL_UNAVAILABLE","LOCAL_MODEL_UNAVAILABLE"),
+            Map.entry("503:NON_LOCAL_MODEL_BLOCKED","NON_LOCAL_MODEL_BLOCKED"),
+            Map.entry("503:MODEL_NOT_CONFIGURED","MODEL_NOT_CONFIGURED"),
+            Map.entry("503:SERVICE_NOT_CONFIGURED","SERVICE_NOT_CONFIGURED"),
+            Map.entry("504:LOCAL_MODEL_TIMEOUT","AI_TIMEOUT"),
+            Map.entry("401:UNAUTHORIZED_SERVICE","AI_SERVICE_AUTH_FAILED"),
+            Map.entry("502:INVALID_MODEL_OUTPUT","INVALID_AI_RESPONSE"),
+            Map.entry("502:INVALID_SOURCE_QUOTE","INVALID_AI_RESPONSE"),
+            Map.entry("502:INCOMPLETE_MODEL_RESPONSE","INVALID_AI_RESPONSE"),
+            Map.entry("502:MODEL_RESPONSE_TOO_LARGE","INVALID_AI_RESPONSE"),
+            Map.entry("503:private unknown code","AI_UNAVAILABLE"),
+            Map.entry("503:MANUAL_REVIEW_REQUIRED","AI_UNAVAILABLE"));
+        for(var entry:cases.entrySet()) {
+            MODE.set("FAIL:"+entry.getKey());UUID id=enqueue();poll();var job=jobs.get(caseId,id);
+            assertThat(job.get("errorCode")).isEqualTo(entry.getValue());
+            assertThat(job.get("rawResponse")).isNull();assertThat(job.get("output")).isNull();
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM recall_condition",Long.class)).isZero();
+    }
+    @Test void oversizedSourcesNeverEnqueueAndSavedOriginalIsPreserved() throws Exception {
+        for(String source:List.of("가".repeat(2001),"😀".repeat(1501),"a\n".repeat(81),"a\u2028".repeat(81))) {
+            UUID oversized=UUID.fromString(postJson("/api/v1/recalls",new NewCase("입력 한도",SourceType.INTERNAL,source),201).get("id").asText());
+            postJson("/api/v1/recalls/"+oversized+"/extractions",Map.of(),422);
+            assertThat(jobs.list(oversized)).isEmpty();assertThat(recalls.getCase(oversized).get("sourceText")).isEqualTo(source);
+        }
+        for(String source:List.of("가".repeat(2000),"😀".repeat(1500),"a\r\n".repeat(80))) {
+            UUID valid=UUID.fromString(postJson("/api/v1/recalls",new NewCase("경계 입력",SourceType.INTERNAL,source),201).get("id").asText());
+            postJson("/api/v1/recalls/"+valid+"/extractions",Map.of(),202);
+        }
     }
     @Test void mockResultsRequireExplicitOptIn() {
         UUID id=enqueue();var work=jobs.claim().orElseThrow();

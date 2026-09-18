@@ -28,8 +28,17 @@ public class ExtractionService {
         guard.requireOpen(caseId);
         require(jdbc.queryForObject("SELECT count(*) FROM extraction_job WHERE case_id=? AND status IN ('QUEUED','RUNNING')",Long.class,caseId)==0,"이 사건에 진행 중인 분석이 있습니다");
         var recall=recalls.getCase(caseId); String source=recall.get("sourceText").toString(); UUID id=UUID.randomUUID();
+        if(source.isBlank())throw new RecallService.Failure(HttpStatus.UNPROCESSABLE_ENTITY,"분석할 원문이 비어 있습니다. 원문을 확인하세요.");
+        if(source.getBytes(StandardCharsets.UTF_8).length>6000 || sourceLines(source)>80)
+            throw new RecallService.Failure(HttpStatus.UNPROCESSABLE_ENTITY,"AI 입력 한도(UTF-8 6,000바이트·80줄)를 초과했습니다. 원문 전체를 보존하고 수동으로 조건을 작성하세요.");
         jdbc.update("INSERT INTO extraction_job(id,case_id,requested_by,source_text,source_sha256,source_version) VALUES (?,?,?,?,?,?)",id,caseId,actor,source,sha(source),recall.get("sourceVersion"));
         return get(caseId,id);
+    }
+    // Match Python str.splitlines(), including CRLF as one break and no extra final line.
+    static int sourceLines(String source) {
+        if(source.isEmpty())return 0;
+        String[] lines=source.split("\\r\\n|[\\n\\r\\u000B\\f\\u001C-\\u001E\\u0085\\u2028\\u2029]",-1);
+        return lines.length-(lines[lines.length-1].isEmpty()?1:0);
     }
     public Map<String,Object> get(UUID caseId,UUID id) {return response(job(caseId,id,false));}
     public List<Map<String,Object>> list(UUID caseId) {

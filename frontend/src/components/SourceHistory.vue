@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AiInputStatus from "./AiInputStatus.vue";
 import { ref, onMounted } from "vue";
 import { api, downloadSource, errorText, dateText, user } from "../api";
 import { useDraftGuard } from "../drafts";
@@ -242,6 +243,7 @@ onMounted(load);
             :disabled="busy"
           />
         </label>
+        <AiInputStatus :text="text" />
         <label
           >원문 수정 사유<textarea
             v-model="note"

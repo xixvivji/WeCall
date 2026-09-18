@@ -269,6 +269,7 @@ onMounted(async () => {
       v-if="tab === 'ai'"
       :case-id="id"
       :source-version="recall.sourceVersion"
+      :source-text="recall.sourceText"
       :closed="closed"
       @updated="load" />
     <template v-if="tab === 'overview'"
