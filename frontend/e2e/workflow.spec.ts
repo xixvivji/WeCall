@@ -114,6 +114,8 @@ test("real backend workflow and role boundaries", async ({ page }) => {
       .fill(id === "P1" ? "제조사·규격 확인" : "별도 규격·제조사 확인");
   }
   await page.getByRole("button", { name: "조건 초안 저장" }).click();
+  // Wait for persisted state before navigation; a slow save still has a draft guard.
+  await expect(page.getByText("조건 v1", { exact: true })).toBeVisible();
   await openFromInbox("CONDITION");
   await expect(
     page.getByText("조건을 승인했습니다.", { exact: false }),
@@ -220,16 +222,21 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     page.getByRole("button", { name: "증거 승인 및 재판정" }),
   ).toBeDisabled();
   await page.getByLabel("입고 증거 검토 사유").fill("입고 수량 불일치 확인");
-  // Hold the parent refresh so an open form overlaps the same-run reload.
+  // Hold the assessment response itself so the form overlaps a confirmed reload.
   let releaseRefresh!: () => void;
   const refreshGate = new Promise<void>((resolve) => {
     releaseRefresh = resolve;
   });
+  let refreshStarted!: () => void;
+  const refreshPending = new Promise<void>((resolve) => {
+    refreshStarted = resolve;
+  });
   const casePath = new URL(page.url()).hash.slice(1).split("?")[0];
   await page.route(
-    `**/api/v1${casePath}`,
+    `**/api/v1${casePath}/assessments/${oldRun}`,
     async (route) => {
       const response = await route.fetch();
+      refreshStarted();
       await refreshGate;
       await route.fulfill({ response });
     },
@@ -239,6 +246,7 @@ test("real backend workflow and role boundaries", async ({ page }) => {
   await expect(
     page.getByText("증거를 반려했습니다.", { exact: true }),
   ).toBeVisible();
+  await refreshPending;
   await page
     .getByRole("button", { name: "입고 증거 등록", exact: true })
     .click();

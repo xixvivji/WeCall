@@ -1,0 +1,278 @@
+{
+  "provenance": "samples/recall-001 — 개발 전용 합성 자료",
+  "notice": "# 가상 공급사 회수 요청 N1\n\n시연·개발 전용 합성 자료. 실제 업체·제품·회수 사실이 아니다.\n\n발표일: 2026-09-09 / 발신자: 가상식품A / 사건: C1\n\n가상식품A의 별빛 크래커 오리지널 100g 제품 중 **제조번호 A01 또는 A02이면서 소비기한이 2026-10-31인 제품**을 회수 대상으로 안내합니다.\n회수 사유: 가상 포장 결함. 200g 제품은 해당하지 않습니다.\n",
+  "evidence": "# 가상 입고명세서 E1\n\n개발용 증거 텍스트이며 실제 OCR 샘플은 아니다.\n\n입고 건 R4 / 입고일 2026-09-04 / 상품 P1 별빛 크래커 오리지널 100g / 제조사 가상식품A / 수량 40 EA / 제조번호 A02 / 소비기한 2026-10-31.\n\n검토 시 입고 건·상품·수량·날짜 일치를 확인한다. 승인 후 R4의 제조번호를 보완한 새 데이터 버전을 만든다. 원래 CSV는 덮어쓰지 않는다. 이 문서는 S2의 미연결 출고 10 EA에 대한 증거가 아니다.\n",
+  "condition": {
+    "datasetId": "00000000-0000-0000-0000-000000000000",
+    "sourceQuote": "제조번호 A01 또는 A02이면서 소비기한이 2026-10-31인 제품",
+    "productReviews": {
+      "P1": {
+        "status": "MATCHED",
+        "reason": "제조사 가상식품A와 규격 100g 일치"
+      },
+      "P2": {
+        "status": "EXCLUDED",
+        "reason": "규격 200g으로 다름"
+      },
+      "P3": {
+        "status": "EXCLUDED",
+        "reason": "제조사 가상식품B로 다름"
+      }
+    },
+    "rule": {
+      "op": "AND",
+      "children": [
+        {
+          "op": "IN",
+          "field": "LOT_NUMBER",
+          "values": ["A01", "A02"]
+        },
+        {
+          "op": "EQ",
+          "field": "EXPIRY_DATE",
+          "values": ["2026-10-31"]
+        }
+      ]
+    }
+  },
+  "totals": {
+    "before": {
+      "inventory": {
+        "TARGET": 110,
+        "NON_TARGET": 110,
+        "NEEDS_REVIEW": 30
+      },
+      "shipments": {
+        "TARGET": 60,
+        "NON_TARGET": 10,
+        "NEEDS_REVIEW": 20
+      }
+    },
+    "after": {
+      "inventory": {
+        "TARGET": 140,
+        "NON_TARGET": 110,
+        "NEEDS_REVIEW": 0
+      },
+      "shipments": {
+        "TARGET": 70,
+        "NON_TARGET": 10,
+        "NEEDS_REVIEW": 10
+      }
+    }
+  },
+  "products": [
+    {
+      "product_id": "P1",
+      "name": "별빛 크래커 오리지널",
+      "manufacturer": "가상식품A",
+      "pack_size": "100g",
+      "unit": "EA"
+    },
+    {
+      "product_id": "P2",
+      "name": "별빛 크래커 대용량",
+      "manufacturer": "가상식품A",
+      "pack_size": "200g",
+      "unit": "EA"
+    },
+    {
+      "product_id": "P3",
+      "name": "별빛 크래커 오리지널",
+      "manufacturer": "가상식품B",
+      "pack_size": "100g",
+      "unit": "EA"
+    }
+  ],
+  "receipts": [
+    {
+      "receipt_id": "R1",
+      "product_id": "P1",
+      "lot_number": "A01",
+      "expiry_date": "2026-10-31",
+      "received_quantity": "100",
+      "received_at": "2026-09-01"
+    },
+    {
+      "receipt_id": "R2",
+      "product_id": "P1",
+      "lot_number": "A02",
+      "expiry_date": "2026-10-31",
+      "received_quantity": "80",
+      "received_at": "2026-09-02"
+    },
+    {
+      "receipt_id": "R3",
+      "product_id": "P1",
+      "lot_number": "A03",
+      "expiry_date": "2026-10-31",
+      "received_quantity": "50",
+      "received_at": "2026-09-03"
+    },
+    {
+      "receipt_id": "R4",
+      "product_id": "P1",
+      "lot_number": "",
+      "expiry_date": "2026-10-31",
+      "received_quantity": "40",
+      "received_at": "2026-09-04"
+    },
+    {
+      "receipt_id": "R5",
+      "product_id": "P1",
+      "lot_number": "A01",
+      "expiry_date": "2026-11-30",
+      "received_quantity": "30",
+      "received_at": "2026-09-05"
+    },
+    {
+      "receipt_id": "R6",
+      "product_id": "P2",
+      "lot_number": "A01",
+      "expiry_date": "2026-10-31",
+      "received_quantity": "20",
+      "received_at": "2026-09-05"
+    },
+    {
+      "receipt_id": "R7",
+      "product_id": "P3",
+      "lot_number": "A01",
+      "expiry_date": "2026-10-31",
+      "received_quantity": "20",
+      "received_at": "2026-09-05"
+    }
+  ],
+  "inventory": [
+    {
+      "inventory_id": "I1",
+      "receipt_id": "R1",
+      "warehouse": "WH1",
+      "quantity": "60",
+      "hold_status": "NONE"
+    },
+    {
+      "inventory_id": "I2",
+      "receipt_id": "R2",
+      "warehouse": "WH1",
+      "quantity": "50",
+      "hold_status": "NONE"
+    },
+    {
+      "inventory_id": "I3",
+      "receipt_id": "R3",
+      "warehouse": "WH1",
+      "quantity": "40",
+      "hold_status": "NONE"
+    },
+    {
+      "inventory_id": "I4",
+      "receipt_id": "R4",
+      "warehouse": "WH1",
+      "quantity": "30",
+      "hold_status": "NONE"
+    },
+    {
+      "inventory_id": "I5",
+      "receipt_id": "R5",
+      "warehouse": "WH1",
+      "quantity": "30",
+      "hold_status": "NONE"
+    },
+    {
+      "inventory_id": "I6",
+      "receipt_id": "R6",
+      "warehouse": "WH1",
+      "quantity": "20",
+      "hold_status": "NONE"
+    },
+    {
+      "inventory_id": "I7",
+      "receipt_id": "R7",
+      "warehouse": "WH1",
+      "quantity": "20",
+      "hold_status": "NONE"
+    }
+  ],
+  "decisions": [
+    {
+      "receipt_id": "R1",
+      "before": "TARGET",
+      "after": "TARGET",
+      "reason": "제조번호와 소비기한 일치"
+    },
+    {
+      "receipt_id": "R2",
+      "before": "TARGET",
+      "after": "TARGET",
+      "reason": "제조번호와 소비기한 일치"
+    },
+    {
+      "receipt_id": "R3",
+      "before": "NON_TARGET",
+      "after": "NON_TARGET",
+      "reason": "제조번호 불일치"
+    },
+    {
+      "receipt_id": "R4",
+      "before": "NEEDS_REVIEW",
+      "after": "TARGET",
+      "reason": "제조번호 누락; 입고 증거 승인 후 A02로 보완"
+    },
+    {
+      "receipt_id": "R5",
+      "before": "NON_TARGET",
+      "after": "NON_TARGET",
+      "reason": "소비기한 불일치"
+    },
+    {
+      "receipt_id": "R6",
+      "before": "NON_TARGET",
+      "after": "NON_TARGET",
+      "reason": "규격이 다른 상품"
+    },
+    {
+      "receipt_id": "R7",
+      "before": "NON_TARGET",
+      "after": "NON_TARGET",
+      "reason": "제조사가 다른 상품"
+    }
+  ],
+  "shipments": [
+    {
+      "shipment_id": "S1",
+      "before_target": "40",
+      "before_non_target": "0",
+      "before_needs_review": "0",
+      "after_target": "40",
+      "after_non_target": "0",
+      "after_needs_review": "0"
+    },
+    {
+      "shipment_id": "S2",
+      "before_target": "20",
+      "before_non_target": "0",
+      "before_needs_review": "10",
+      "after_target": "20",
+      "after_non_target": "0",
+      "after_needs_review": "10"
+    },
+    {
+      "shipment_id": "S3",
+      "before_target": "0",
+      "before_non_target": "10",
+      "before_needs_review": "0",
+      "after_target": "0",
+      "after_non_target": "10",
+      "after_needs_review": "0"
+    },
+    {
+      "shipment_id": "S4",
+      "before_target": "0",
+      "before_non_target": "0",
+      "before_needs_review": "10",
+      "after_target": "10",
+      "after_non_target": "0",
+      "after_needs_review": "0"
+    }
+  ]
+}

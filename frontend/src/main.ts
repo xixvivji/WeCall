@@ -14,6 +14,7 @@ import "./style.css";
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
+    { path: "/demo", component: () => import("./views/Demo.vue") },
     { path: "/", component: Cases },
     { path: "/workspace", component: Workspace },
     { path: "/reviews", component: ReviewInbox },
@@ -28,4 +29,5 @@ const router = createRouter({
 router.beforeEach(
   (to, from) => to.fullPath === from.fullPath || confirmDrafts(),
 );
-createApp(App).use(router).mount("#app");
+const app = createApp(App).use(router);
+router.isReady().then(() => app.mount("#app"));
