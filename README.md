@@ -142,3 +142,5 @@ API 키와 비밀번호는 Git에 올리지 않습니다. `.env` 파일은 Git�
 - [백엔드 MVP 인수·프론트/AI 후속 작업](docs/validation/backend-handoff.md)
 
 개발·시연 범위의 완료 근거와 운영 전 남은 항목은 [MVP 마무리 기록](docs/validation/mvp-completion-2026-09-18.md)을 참고하세요.
+
+로그인 없이 `/#/demo`에서 [합성 샘플 단계별 체험](docs/design/guided-demo.md)을 시작할 수 있습니다. 해당 체험은 실제 AI 실행·업무 데이터 수정 없이 진행됩니다.

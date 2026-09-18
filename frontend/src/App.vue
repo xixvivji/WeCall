@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import BrandFlow from "./components/BrandFlow.vue";
 import { confirmDrafts } from "./drafts";
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
+const route = useRoute();
 import {
   ClipboardList,
   Database,
@@ -23,7 +25,8 @@ const ready = ref(false),
   error = ref(""),
   username = ref(""),
   password = ref("");
-onMounted(async () => {
+async function initialize() {
+  ready.value = false;
   try {
     await restoreSession();
   } catch (e) {
@@ -31,7 +34,16 @@ onMounted(async () => {
   } finally {
     ready.value = true;
   }
+}
+onMounted(() => {
+  if (route.path !== "/demo") initialize();
 });
+watch(
+  () => route.path,
+  (to, from) => {
+    if (from === "/demo" && to !== "/demo") initialize();
+  },
+);
 async function signIn() {
   busy.value = true;
   error.value = "";
@@ -54,7 +66,8 @@ async function signOut() {
 }
 </script>
 <template>
-  <div v-if="!ready" class="loading" role="status">
+  <RouterView v-if="$route.path === '/demo'" />
+  <div v-else-if="!ready" class="loading" role="status">
     업무 공간을 불러오는 중입니다…
   </div>
   <div v-else-if="!user" class="login-layout">
@@ -74,6 +87,16 @@ async function signOut() {
       </div>
     </section>
     <main class="login-form">
+      <div class="sample-entry">
+        <p class="eyebrow">FIRST TIME HERE?</p>
+        <h2>샘플로 먼저 둘러보세요</h2>
+        <p class="muted small">
+          로그인 없이 원문 검토부터 대응까지 체험해 보세요.
+        </p>
+        <RouterLink to="/demo" class="sample-entry-link"
+          >샘플 체험 시작 →</RouterLink
+        >
+      </div>
       <div class="eyebrow">WORKSPACE LOGIN</div>
       <h2>WeCall에 로그인</h2>
       <p class="muted">발급받은 계정으로 업무 공간에 접속하세요.</p>
@@ -124,6 +147,7 @@ async function signOut() {
         <RouterLink v-if="user.roles.includes('REVIEWER')" to="/reviews"
           ><ShieldCheck :size="20" />검토 대기함</RouterLink
         >
+        <RouterLink to="/demo"><ShieldCheck :size="20" />샘플 체험</RouterLink>
         <RouterLink to="/account"><KeyRound :size="20" />내 계정</RouterLink>
       </nav>
       <div class="sidebar-bottom">
