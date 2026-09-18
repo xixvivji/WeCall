@@ -222,16 +222,21 @@ test("real backend workflow and role boundaries", async ({ page }) => {
     page.getByRole("button", { name: "증거 승인 및 재판정" }),
   ).toBeDisabled();
   await page.getByLabel("입고 증거 검토 사유").fill("입고 수량 불일치 확인");
-  // Hold the parent refresh so an open form overlaps the same-run reload.
+  // Hold the assessment response itself so the form overlaps a confirmed reload.
   let releaseRefresh!: () => void;
   const refreshGate = new Promise<void>((resolve) => {
     releaseRefresh = resolve;
   });
+  let refreshStarted!: () => void;
+  const refreshPending = new Promise<void>((resolve) => {
+    refreshStarted = resolve;
+  });
   const casePath = new URL(page.url()).hash.slice(1).split("?")[0];
   await page.route(
-    `**/api/v1${casePath}`,
+    `**/api/v1${casePath}/assessments/${oldRun}`,
     async (route) => {
       const response = await route.fetch();
+      refreshStarted();
       await refreshGate;
       await route.fulfill({ response });
     },
@@ -241,6 +246,7 @@ test("real backend workflow and role boundaries", async ({ page }) => {
   await expect(
     page.getByText("증거를 반려했습니다.", { exact: true }),
   ).toBeVisible();
+  await refreshPending;
   await page
     .getByRole("button", { name: "입고 증거 등록", exact: true })
     .click();
