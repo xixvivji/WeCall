@@ -25,6 +25,7 @@ public class CaseReportController {
         var assessment=assessmentId==null?null:recalls.getAssessment(caseId,assessmentId);
         result.put("assessment",assessment);
         result.put("condition",assessment==null?null:recalls.getCondition(caseId,assessment.conditionId()));
+        result.put("assessmentSourceVersion",assessment==null?null:jdbc.queryForObject("SELECT source_version FROM assessment_run WHERE id=?",Long.class,assessmentId));
         result.put("assessmentCreatedAt",assessment==null?null:jdbc.queryForObject("SELECT created_at FROM assessment_run WHERE id=?",java.time.OffsetDateTime.class,assessmentId));
         result.put("datasetAsOf",assessment==null?null:jdbc.queryForObject("SELECT as_of FROM dataset WHERE id=?",java.time.OffsetDateTime.class,assessment.datasetId()));
         result.put("tasks",tasks.list(caseId));

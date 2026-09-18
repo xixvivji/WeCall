@@ -1,12 +1,12 @@
 # 현재 구성과 데이터 흐름
 
-기준: 2026-09-17, Flyway V12. 로컬 개발 구성으로, 운영 배포도나 회사가 승인한 보안 경계는 아니다.
+기준: 2026-09-18, Flyway V13. 로컬 개발 구성으로, 운영 배포도나 회사가 승인한 보안 경계는 아니다.
 
 ```mermaid
 flowchart LR
     U[검토자 / 실행 담당자] --> V[Vue 3 + TypeScript / Vite 5173]
     V -->|세션 쿠키 / CSRF / 개발 프록시| B[Java 21 / Spring Boot 3.5.16 / 8080]
-    B -->|JDBC / 트랜잭션| P[(PostgreSQL 17.6 / Flyway V1~V12)]
+    B -->|JDBC / 트랜잭션| P[(PostgreSQL 17.6 / Flyway V1~V13)]
     B --> D[PDFBox / 텍스트 추출]
     B --> S[AttachmentStorage]
     S --> L[전용 로컬 디렉터리 / 원본 PDF와 증빙 파일]
@@ -35,7 +35,7 @@ Gradle Wrapper 8.7, Python 3.12·uv를 사용한다. 브라우저는 PostgreSQL�
 
 PDF 미리보기는 임시 처리다. 사건 등록 시 파일을 다시 검사·추출하고 미리보기 해시와 대조해 원본·서버 추출본·검토 원문 v1을 함께 저장한다. 이후 원문 수정은 source_revision을 추가하고 사건의 현재 원문 버전을 갱신한다. 과거 버전의 AI 결과는 유지하되 새 조건 전환을 차단한다.
 
-입고 증거 승인에 따른 데이터 보완은 새로운 dataset과 assessment_run을 만든다. 상품 연결은 조건 정의 JSONB, 개별 판정은 결과 JSONB에 저장한다. 과거 판정·승인은 원문 수정만으로 바뀌지 않는다. 조건·판정의 원문 재검토 표시 개선은 [미구현 제안](product-roadmap.md)이다.
+입고 증거 승인에 따른 데이터 보완은 새로운 dataset과 assessment_run을 만든다. 상품 연결은 조건 정의 JSONB, 개별 판정은 결과 JSONB에 저장한다. 과거 판정·승인은 원문 수정만으로 바뀌지 않는다. 조건의 원문 버전·영향 없음 검토로 승인·새 판정·종료를 제어한다. [재검토 계약](source-revalidation.md)을 따른다.
 
 원문 버전(source_version), 조건 버전, 데이터 ID, 판정 ID, 작업 버전, 사건 종료·재개 버전은 서로 다른 개념이다. 번호가 같다고 동일 시점·근거로 묶지 않는다. 상세 구조는 [실제 ERD](erd.md)를 따른다.
 

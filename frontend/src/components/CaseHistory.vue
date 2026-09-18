@@ -33,6 +33,8 @@ const kinds: Record<string, string> = {
   LIFECYCLE: "사건 종료·재개",
 };
 const types: Record<string, string> = {
+  CONDITION_SOURCE_REVIEWED: "원문 영향 없음 확인",
+  CONDITION_WITHDRAWN: "조건 초안 철회",
   CONDITION_APPROVED: "조건 승인",
   EVIDENCE_APPROVED: "입고 증거 승인",
   EVIDENCE_REJECTED: "입고 증거 반려",

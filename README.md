@@ -37,6 +37,7 @@ Spring Boot는 업무 로직·조건 판정·승인·데이터 저장을 맡고,
 - [사건 종료 점검·승인·재개 API](docs/design/closure-api.md)
 - [로컬 AI 실행·지원 범위·평가](docs/design/local-ai.md)
 - [PDF 원본 보관·원문 수정 이력](docs/design/source-pdf.md)
+- [원문 변경 후 조건·판정 재검토](docs/design/source-revalidation.md)
 - [FastAPI 조건 추출 연동·모의 시연](docs/design/ai-extraction-api.md)
 - [Vue 업무 화면·실행 방법·조회 API](docs/design/frontend-workspace.md)
 - [AI 데이터 처리 경계와 미구현 보안 통제](docs/design/ai-data-boundary.md)

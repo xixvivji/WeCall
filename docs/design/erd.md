@@ -1,6 +1,6 @@
 # 구현 ERD와 데이터 사전
 
-기준: 2026-09-17, 원문 보관·이력 V12 반영. [Flyway V1~V12](../../backend/src/main/resources/db/migration/)의 실제 23개 테이블을 기준으로 한다. 단일 기업 모델이며 아래 선은 DB FK 관계다. 복합 FK의 정확한 컬럼은 데이터 사전·SQL을 따른다.
+기준: 2026-09-18, 원문 재검토 V13 반영. [Flyway V1~V13](../../backend/src/main/resources/db/migration/)의 실제 24개 테이블을 기준으로 한다. 단일 기업 모델이며 아래 선은 DB FK 관계다. 복합 FK의 정확한 컬럼은 데이터 사전·SQL을 따른다.
 
 ## 입력 데이터
 
@@ -54,7 +54,7 @@ erDiagram
 | 테이블 | 주요 구조 | 제약·상태 |
 | --- | --- | --- |
 | recall_case | id UUID PK; title, source_type, source_text, source_version, created_at, status, lifecycle_version, closed_at | 출처 SUPPLIER/OFFICIAL/INTERNAL; OPEN/CLOSED와 closed_at 일관성 |
-| recall_condition | id PK; case_id FK, dataset_id FK, version, definition JSONB, status, approved_by/at | (case_id,version) 유일; DRAFT/APPROVED와 승인 정보 일관성 |
+| recall_condition | id PK; case_id FK, dataset_id FK, version, definition JSONB, status, approved_by/at | (case_id,version) 유일; DRAFT/APPROVED/WITHDRAWN과 승인·철회 정보 일관성 |
 | assessment_run | id PK; case_id, condition_id, dataset_id, result JSONB, created_at | (condition_id,case_id,dataset_id)로 조건 FK; id+사건 및 id+사건+데이터 복합 유일키 |
 | receipt_evidence | id PK; case_id; base_assessment_id/base_dataset_id/receipt_id; document_text/hash; proposal JSONB; status; 검토자·사유·시각; result_dataset_id/result_assessment_id | 사건·기준 판정·기준 입고 FK; 결과 판정의 사건/데이터 일치; 결과 데이터·판정 각각 유일; PENDING/APPROVED/REJECTED |
 | response_task | id PK; case_id; assessment_id nullable; task_type, target_type/target_id, title, instructions, assignee; status, version, review_round, completed_at | 사건 FK; 판정+사건 복합 FK; CASE는 target_id 없음, INVENTORY/SHIPMENT는 target_id·판정 필수; OPEN/IN_PROGRESS/COMPLETED/CANCELLED |
@@ -121,6 +121,19 @@ erDiagram
 | source_document_event | id UUID PK; document_id FK; event_type, actor, created_at | UPLOADED/DOWNLOAD_REQUESTED; 전송 완료를 뜻하지 않음 |
 | source_revision | (case_id,version) PK; source_text, actor nullable, note, created_at | case_id FK; 원문 버전 >0, 텍스트 1~100,000자; 기존 사건의 등록자 미상은 null |
 
-recall_case.source_version은 현재 원문 버전이며 extraction_job.source_version은 요청 당시 버전이다. 둘 다 양수 CHECK가 있고 원문 수정·AI 전환의 버전 일치는 서비스 트랜잭션에서 검사한다. source_revision과 연결하는 복합 FK가 구현돼 있다는 뜻은 아니다. 조건 테이블에는 현재 원문 버전 컬럼이 없다. 기존 승인 조건의 원문 재검토 관리는 [후속 제안](product-roadmap.md)이다.
+recall_case.source_version은 현재 원문 버전이며 extraction_job.source_version은 요청 당시 버전이다. 둘 다 양수 CHECK가 있고 원문 수정·AI 전환의 버전 일치는 서비스 트랜잭션에서 검사한다. source_revision과 연결하는 복합 FK가 구현돼 있다는 뜻은 아니다. V13에서 조건·판정의 기준 원문 버전 및 재검토 이력을 추가했다. 아래 항목을 따른다.
 
 등록 트랜잭션은 PDF 원본·서버 추출본·검토 원문 v1을 함께 보존한다. 수정은 source_revision에 추가하고 recall_case의 현재 원문을 갱신한다. 기존 사건은 원문 v1로 이전하며 과거 원본 PDF나 등록자를 추정해서 채우지 않는다. [상세 API](source-pdf.md)
+
+
+## V13 조건 원문 재검토
+
+recall_condition.source_version과 assessment_run.source_version은 생성 당시 원문 버전(과거 기록은 NULL)이다. 조건은 WITHDRAWN 상태와 withdrawn_by/at, withdrawal_note를 추가하고 상태·승인·철회 일관성을 CHECK로 보장한다.
+
+```mermaid
+erDiagram
+    recall_condition ||--o{ condition_source_review : revalidates
+    source_revision ||--o{ condition_source_review : reviewed_source
+```
+
+condition_source_review의 PK는 (condition_id,source_version), FK는 (condition_id,case_id)→recall_condition, (case_id,source_version)→source_revision이다. reviewer/note/created_at을 기록한다. condition_source_state는 조건의 생성 기준과 현재 사건 버전, 해당 버전 검토 유무로 review_required를 계산하는 뷰다. 상세 동작은 [재검토 API](source-revalidation.md)를 따른다.

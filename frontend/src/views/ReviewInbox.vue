@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { api, user, errorText, dateText, type Page } from "../api";
 interface Review {
-  kind: "CONDITION" | "EVIDENCE" | "PROOF";
+  kind: "CONDITION" | "SOURCE" | "EVIDENCE" | "PROOF";
   id: string;
   caseId: string;
   caseTitle: string;
@@ -12,6 +12,7 @@ interface Review {
 }
 const names = {
   CONDITION: "조건 승인",
+  SOURCE: "원문 재검토",
   EVIDENCE: "입고 증거",
   PROOF: "작업 증빙",
 };
@@ -47,12 +48,11 @@ async function load(reset = false) {
 function destination(row: Review) {
   return {
     path: "/recalls/" + row.caseId,
-    query:
-      row.kind === "CONDITION"
-        ? { condition: row.id }
-        : row.kind === "EVIDENCE"
-          ? { evidence: row.id }
-          : { task: row.taskId!, proof: row.id },
+    query: ["CONDITION", "SOURCE"].includes(row.kind)
+      ? { condition: row.id }
+      : row.kind === "EVIDENCE"
+        ? { evidence: row.id }
+        : { task: row.taskId!, proof: row.id },
   };
 }
 onMounted(() => load());
@@ -90,15 +90,16 @@ onMounted(() => load());
         </fieldset>
       </form>
       <p class="note">
-        조건 초안·입고 증거·현재 처리 회차의 작업 증빙을 표시합니다. 취소된
-        작업도 미검토 증빙이 있으면 포함됩니다. 검토 열기로 근거를 확인한 뒤
-        기존 화면에서 처리하세요.
+        조건 초안·최신 승인 조건의 원문 재검토·입고 증거·현재 처리 회차의 작업
+        증빙을 표시합니다. 취소된 작업도 미검토 증빙이 있으면 포함됩니다. 검토
+        열기로 근거를 확인한 뒤 기존 화면에서 처리하세요.
       </p>
       <p v-if="busy" role="status">불러오는 중…</p>
       <template v-if="data"
         ><p class="muted">
-          검색어 기준 · 조건 승인 {{ data.counts.CONDITION }}건 · 입고 증거
-          {{ data.counts.EVIDENCE }}건 · 작업 증빙 {{ data.counts.PROOF }}건
+          검색어 기준 · 원문 재검토 {{ data.counts.SOURCE ?? 0 }}건 · 조건 승인
+          {{ data.counts.CONDITION }}건 · 입고 증거 {{ data.counts.EVIDENCE }}건
+          · 작업 증빙 {{ data.counts.PROOF }}건
         </p>
         <p v-if="!data.items.length" class="empty">
           조회 조건에 맞는 검토 대기 항목이 없습니다.

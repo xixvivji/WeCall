@@ -18,6 +18,11 @@ public class WorkspaceController {
             '조건 v' || r.version AS title,r.created_at,NULL::uuid AS task_id
         FROM recall_condition r JOIN recall_case c ON c.id=r.case_id WHERE r.status='DRAFT' AND c.status='OPEN'
         UNION ALL
+        SELECT 'SOURCE',r.id,r.case_id,c.title,'조건 v' || r.version || ' · 원문 재검토',c.created_at,NULL::uuid
+        FROM recall_condition r JOIN recall_case c ON c.id=r.case_id JOIN condition_source_state s ON s.id=r.id
+        WHERE r.status='APPROVED' AND c.status='OPEN' AND s.review_required
+            AND NOT EXISTS(SELECT 1 FROM recall_condition n WHERE n.case_id=r.case_id AND n.status<>'WITHDRAWN' AND n.version>r.version)
+        UNION ALL
         SELECT 'EVIDENCE',e.id,e.case_id,c.title,'입고 ' || e.receipt_id || ' 증거',e.created_at,NULL::uuid
         FROM receipt_evidence e JOIN recall_case c ON c.id=e.case_id WHERE e.status='PENDING' AND c.status='OPEN'
         UNION ALL
@@ -30,11 +35,11 @@ public class WorkspaceController {
     public Map<String,Object> reviews(@RequestParam(defaultValue="ALL") String kind,@RequestParam(defaultValue="") String q,
         @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
         if(!CurrentActor.reviewer())throw new RecallService.Failure(HttpStatus.FORBIDDEN,"검토 대기함은 검토자만 사용할 수 있습니다");
-        if(!Set.of("ALL","CONDITION","EVIDENCE","PROOF").contains(kind)||q.length()>200||page<0||size<1||size>100)
+        if(!Set.of("ALL","CONDITION","SOURCE","EVIDENCE","PROOF").contains(kind)||q.length()>200||page<0||size<1||size>100)
             throw new RecallService.Failure(HttpStatus.BAD_REQUEST,"검토 대기함 조회 조건을 확인하세요");
         String from=" FROM ("+REVIEWS+") r WHERE (strpos(lower(case_title),lower(?))>0 OR strpos(lower(title),lower(?))>0)";
         List<Object> args=new ArrayList<>(List.of(q.strip(),q.strip()));
-        Map<String,Long> counts=new LinkedHashMap<>();for(String k:List.of("CONDITION","EVIDENCE","PROOF"))counts.put(k,0L);
+        Map<String,Long> counts=new LinkedHashMap<>();for(String k:List.of("CONDITION","SOURCE","EVIDENCE","PROOF"))counts.put(k,0L);
         jdbc.query("SELECT kind,count(*) AS n"+from+" GROUP BY kind",rs->{counts.put(rs.getString("kind"),rs.getLong("n"));},args.toArray());
         if(!kind.equals("ALL")){from+=" AND kind=?";args.add(kind);}
         long total=kind.equals("ALL")?counts.values().stream().mapToLong(Long::longValue).sum():counts.get(kind);
@@ -53,7 +58,10 @@ public class WorkspaceController {
                 WHERE c.status='OPEN' AND ((a.result->'inventoryTotals'->>'needsReview')::bigint>0
                     OR (a.result->'shipmentTotals'->>'needsReview')::bigint>0)) AS "reviewCases",
             (SELECT count(*) FROM recall_case c WHERE c.status='OPEN' AND NOT EXISTS
-                (SELECT 1 FROM assessment_run a WHERE a.case_id=c.id)) AS "unassessedCases"
+                (SELECT 1 FROM assessment_run a WHERE a.case_id=c.id)) AS "unassessedCases",
+            (SELECT count(DISTINCT c.id) FROM recall_case c JOIN recall_condition r ON r.case_id=c.id
+             JOIN condition_source_state s ON s.id=r.id WHERE c.status='OPEN' AND s.review_required
+             AND (r.status='DRAFT' OR NOT EXISTS(SELECT 1 FROM recall_condition newer WHERE newer.case_id=c.id AND newer.status<>'WITHDRAWN' AND newer.version>r.version))) AS "sourceReviewCases"
             """,CurrentActor.username());
     }
     @GetMapping("/tasks")

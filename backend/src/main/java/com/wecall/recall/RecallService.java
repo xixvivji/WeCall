@@ -15,7 +15,8 @@ public class RecallService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final CaseGuard guard;
-    public RecallService(JdbcTemplate jdbc, ObjectMapper json, CaseGuard guard) { this.jdbc=jdbc; this.json=json; this.guard=guard; }
+    private final ConditionSourceService source;
+    public RecallService(JdbcTemplate jdbc, ObjectMapper json, CaseGuard guard,ConditionSourceService source) { this.jdbc=jdbc; this.json=json; this.guard=guard; this.source=source; }
     public static class Failure extends RuntimeException {
         public final HttpStatus status;
         public Failure(HttpStatus status, String message) { super(message); this.status=status; }
@@ -57,7 +58,7 @@ public class RecallService {
     }
     public List<Map<String,Object>> listAssessments(UUID caseId) {
         getCase(caseId);
-        return jdbc.queryForList("SELECT id,condition_id AS \"conditionId\",dataset_id AS \"datasetId\",created_at AS \"createdAt\" FROM assessment_run WHERE case_id=? ORDER BY created_at DESC,id DESC",caseId);
+        return jdbc.queryForList("SELECT id,condition_id AS \"conditionId\",dataset_id AS \"datasetId\",source_version AS \"sourceVersion\",created_at AS \"createdAt\" FROM assessment_run WHERE case_id=? ORDER BY created_at DESC,id DESC",caseId);
     }
     @Transactional
     public Map<String,Object> createCase(NewCase request) {
@@ -90,7 +91,7 @@ public class RecallService {
         ensure(request.productReviews().values().stream().anyMatch(r->r.status()==Match.MATCHED),HttpStatus.BAD_REQUEST,"최소 한 상품의 연결 확인이 필요합니다");
         UUID id=UUID.randomUUID();
         int version=jdbc.queryForObject("SELECT COALESCE(max(version),0)+1 FROM recall_condition WHERE case_id=?",Integer.class,caseId);
-        jdbc.update("INSERT INTO recall_condition(id,case_id,dataset_id,version,definition) VALUES (?,?,?,?,?::jsonb)",id,caseId,request.datasetId(),version,encode(request));
+        jdbc.update("INSERT INTO recall_condition(id,case_id,dataset_id,version,definition,source_version) VALUES (?,?,?,?,?::jsonb,?)",id,caseId,request.datasetId(),version,encode(request),recall.get("source_version"));
         return getCondition(caseId,id);
     }
     public Map<String,Object> getCondition(UUID caseId, UUID conditionId) {
@@ -103,13 +104,18 @@ public class RecallService {
         response.put("definition",decode(row.get("definition"),NewCondition.class));
         response.put("approvedBy",row.get("approved_by"));
         response.put("approvedAt",row.get("approved_at")==null?null:row.get("approved_at").toString());
+        response.put("sourceReview",source.state((UUID)row.get("case_id"),(UUID)row.get("id")));
+        response.put("withdrawnBy",row.get("withdrawn_by")); response.put("withdrawalNote",row.get("withdrawal_note"));
+        response.put("withdrawnAt",row.get("withdrawn_at")==null?null:row.get("withdrawn_at").toString());
         return response;
     }
+    public void requireCurrentSource(UUID caseId,UUID conditionId) { source.requireCurrent(caseId,conditionId); }
     @Transactional
     public Map<String,Object> approve(UUID caseId, UUID conditionId, Approval request) {
         guard.requireOpen(caseId);
         var row=one("SELECT * FROM recall_condition WHERE case_id=? AND id=? FOR UPDATE",caseId,conditionId);
         ensure(row.get("status").equals("DRAFT"),HttpStatus.CONFLICT,"이미 승인된 조건입니다. 변경은 새 조건 버전을 생성하세요");
+        source.requireCurrent(caseId,conditionId);
         jdbc.update("UPDATE recall_condition SET status='APPROVED',approved_by=?,approved_at=now() WHERE id=?",request.reviewer(),conditionId);
         return getCondition(caseId,conditionId);
     }
@@ -118,6 +124,7 @@ public class RecallService {
         guard.requireOpen(caseId);
         var condition=one("SELECT * FROM recall_condition WHERE case_id=? AND id=?",caseId,conditionId);
         ensure(condition.get("status").equals("APPROVED"),HttpStatus.CONFLICT,"조건 승인 후 판정할 수 있습니다");
+        source.requireCurrent(caseId,conditionId);
         NewCondition definition=decode(condition.get("definition"),NewCondition.class);
         UUID datasetId=definition.datasetId();
         Map<String,ReceiptDecision> decisions=new LinkedHashMap<>();
@@ -154,7 +161,7 @@ public class RecallService {
         var result=new Assessment(UUID.randomUUID(),caseId,conditionId,datasetId,List.copyOf(decisions.values()),inventory,shipments,
             new Totals(stockTotals[0],stockTotals[1],stockTotals[2]),
             new Totals(shipments.stream().mapToLong(ShipmentImpact::target).sum(),shipments.stream().mapToLong(ShipmentImpact::nonTarget).sum(),shipments.stream().mapToLong(ShipmentImpact::needsReview).sum()));
-        jdbc.update("INSERT INTO assessment_run(id,case_id,condition_id,dataset_id,result) VALUES (?,?,?,?,?::jsonb)",result.id(),caseId,conditionId,datasetId,encode(result));
+        jdbc.update("INSERT INTO assessment_run(id,case_id,condition_id,dataset_id,result,source_version) VALUES (?,?,?,?,?::jsonb,?)",result.id(),caseId,conditionId,datasetId,encode(result),jdbc.queryForObject("SELECT source_version FROM recall_case WHERE id=?",Long.class,caseId));
         return result;
     }
     public Assessment getAssessment(UUID caseId,UUID runId) {

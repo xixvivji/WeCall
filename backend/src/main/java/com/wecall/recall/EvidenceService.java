@@ -119,8 +119,9 @@ public class EvidenceService {
         UUID baseDatasetId=(UUID)row.get("base_dataset_id");
         var errors=issues(p,facts(baseDatasetId,p.receiptId()));
         if (!errors.isEmpty()) throw new Blocked(errors);
-        UUID derived=copyDataset(baseDatasetId,p);
         Assessment base=recalls.getAssessment(caseId,p.baseAssessmentId());
+        recalls.requireCurrentSource(caseId,base.conditionId());
+        UUID derived=copyDataset(baseDatasetId,p);
         var original=(NewCondition)recalls.getCondition(caseId,base.conditionId()).get("definition");
         var next=new NewCondition(derived,original.rule(),original.productReviews(),original.sourceQuote());
         UUID conditionId=(UUID)recalls.createCondition(caseId,next).get("id");
