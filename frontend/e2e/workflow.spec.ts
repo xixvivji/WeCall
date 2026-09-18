@@ -114,6 +114,8 @@ test("real backend workflow and role boundaries", async ({ page }) => {
       .fill(id === "P1" ? "제조사·규격 확인" : "별도 규격·제조사 확인");
   }
   await page.getByRole("button", { name: "조건 초안 저장" }).click();
+  // Wait for persisted state before navigation; a slow save still has a draft guard.
+  await expect(page.getByText("조건 v1", { exact: true })).toBeVisible();
   await openFromInbox("CONDITION");
   await expect(
     page.getByText("조건을 승인했습니다.", { exact: false }),
