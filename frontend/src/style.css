@@ -7,8 +7,8 @@
     "Apple SD Gothic Neo",
     "Noto Sans KR",
     sans-serif;
-  color: #24352f;
-  background: #f5f7f7;
+  color: #202535;
+  background: #f5f6f9;
   font-synthesis: none;
   font-size: 16px;
   line-height: 1.55;
@@ -35,7 +35,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid #dce3e0;
+  border: 1px solid #dce0e9;
   border-radius: 8px;
   background: white;
   padding: 9px 15px;
@@ -44,7 +44,7 @@ button {
   font-weight: 600;
 }
 button:hover {
-  background: #edf3f0;
+  background: #eef1fa;
 }
 button:disabled {
   opacity: 0.5;
@@ -59,17 +59,17 @@ input,
 textarea,
 select {
   width: 100%;
-  border: 1px solid #d4ded9;
+  border: 1px solid #d6dce8;
   border-radius: 8px;
   padding: 10px 12px;
   background: white;
-  color: #203b30;
+  color: #202535;
   font-size: 0.9375rem;
 }
 input:focus,
 textarea:focus,
 select:focus {
-  outline: 2px solid #449780;
+  outline: 2px solid #5269cf;
   outline-offset: 1px;
 }
 label {
@@ -109,12 +109,12 @@ form {
   margin: 0;
 }
 .primary {
-  background: #116753;
+  background: #314cb7;
   color: white;
-  border-color: #116753;
+  border-color: #314cb7;
 }
 .primary:hover {
-  background: #0c5141;
+  background: #24398c;
 }
 .secondary {
   background: white;
@@ -123,13 +123,13 @@ form {
   width: 100%;
 }
 .muted {
-  color: #667b71;
+  color: #697186;
 }
 .small {
   font-size: 0.875rem;
 }
 .eyebrow {
-  color: #668075;
+  color: #626f8c;
   font-size: 0.75rem;
   letter-spacing: 0.15em;
   font-weight: 700;
@@ -141,7 +141,7 @@ form {
   letter-spacing: -0.075em;
 }
 .brand-dot {
-  color: #36ad85;
+  color: #6886ff;
 }
 .workspace {
   display: flex;
@@ -150,7 +150,7 @@ form {
 .sidebar {
   width: 230px;
   background: #fff;
-  border-right: 1px solid #e2e9e5;
+  border-right: 1px solid #e1e5ed;
   padding: 25px 22px;
   display: flex;
   flex-direction: column;
@@ -159,12 +159,12 @@ form {
 }
 .workspace-name {
   font-size: 0.75rem;
-  color: #7b8c85;
+  color: #778199;
   margin: 2px 0 45px;
 }
 .nav-label {
   font-size: 0.75rem;
-  color: #8c9b93;
+  color: #8490a9;
   padding-left: 12px;
   margin-bottom: 10px;
 }
@@ -179,11 +179,11 @@ form {
   gap: 12px;
   font-size: 0.9375rem;
   border-radius: 8px;
-  color: #64766c;
+  color: #657088;
 }
 .sidebar nav a.router-link-active {
-  background: #eaf4ef;
-  color: #116753;
+  background: #edf0ff;
+  color: #314cb7;
   font-weight: 700;
 }
 .sidebar-bottom {
@@ -192,7 +192,7 @@ form {
   gap: 10px;
   align-items: center;
   padding-top: 20px;
-  border-top: 1px solid #e5ebe7;
+  border-top: 1px solid #e7eaf1;
   font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
@@ -201,7 +201,7 @@ form {
   height: 33px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #e4ede8;
+  background: #e9edfa;
   display: grid;
   place-items: center;
 }
@@ -217,7 +217,7 @@ form {
 }
 .topbar {
   height: 70px;
-  border-bottom: 1px solid #e2e9e5;
+  border-bottom: 1px solid #e1e5ed;
   background: #fff;
   display: flex;
   align-items: center;
@@ -227,7 +227,7 @@ form {
 }
 .divider {
   margin: 0 14px;
-  color: #b0bdb6;
+  color: #b4bccf;
 }
 .content {
   max-width: 1500px;
@@ -247,7 +247,7 @@ form {
 }
 .panel {
   background: white;
-  border: 1px solid #e0e7e2;
+  border: 1px solid #e1e5ed;
   border-radius: 12px;
   padding: 26px;
   margin-bottom: 22px;
@@ -260,7 +260,7 @@ form {
   display: flex;
   gap: 12px;
   padding: 22px;
-  border-bottom: 1px solid #e5ebe7;
+  border-bottom: 1px solid #e7eaf1;
 }
 .filters select {
   width: 150px;
@@ -270,7 +270,7 @@ form {
   align-items: center;
   gap: 8px;
   flex: 1;
-  border: 1px solid #d4ded9;
+  border: 1px solid #d6dce8;
   padding-left: 12px;
   border-radius: 8px;
 }
@@ -295,19 +295,19 @@ table {
 }
 th {
   padding: 12px 20px;
-  background: #f7f9f8;
-  color: #75867d;
+  background: #f7f8fb;
+  color: #66728a;
   font-size: 0.8125rem;
   font-weight: 500;
   white-space: nowrap;
 }
 td {
   padding: 19px 20px;
-  border-bottom: 1px solid #eef1ef;
+  border-bottom: 1px solid #edf0f6;
   vertical-align: middle;
 }
 tbody tr:hover {
-  background: #fbfdfc;
+  background: #f7f9ff;
 }
 .case-link {
   font-weight: 650;
@@ -351,7 +351,7 @@ tbody tr:hover {
   justify-content: space-between;
   padding: 18px 24px;
   font-size: 0.8125rem;
-  color: #718379;
+  color: #66728a;
 }
 .pagination div {
   display: flex;
@@ -363,16 +363,16 @@ tbody tr:hover {
 .empty {
   text-align: center;
   padding: 65px 20px;
-  color: #788a80;
+  color: #68738a;
   font-size: 0.9375rem;
 }
 .empty h3 {
-  color: #465e51;
+  color: #39465f;
   margin-bottom: 8px;
 }
 .footnote {
   font-size: 0.8125rem;
-  color: #819088;
+  color: #69768b;
 }
 .error {
   background: #fff0ee;
@@ -409,7 +409,7 @@ tbody tr:hover {
   background: white;
 }
 .login-intro {
-  background: #103f34;
+  background: #0b1026;
   color: white;
   padding: 55px 12%;
   display: flex;
@@ -428,7 +428,7 @@ tbody tr:hover {
   letter-spacing: -0.06em;
 }
 .login-intro p {
-  color: #b8d2c7;
+  color: #c2cee8;
   font-size: 0.9375rem;
 }
 .intro-footer {
@@ -436,7 +436,7 @@ tbody tr:hover {
   gap: 10px;
   margin-top: 65px;
   font-size: 0.8125rem;
-  color: #a4c4b6;
+  color: #b2bed8;
 }
 .login-form {
   width: 100%;
@@ -465,7 +465,7 @@ tbody tr:hover {
 .tabs {
   display: flex;
   gap: 24px;
-  border-bottom: 1px solid #d9e4dd;
+  border-bottom: 1px solid #dde3ef;
   margin-bottom: 24px;
   overflow-x: auto;
 }
@@ -478,12 +478,12 @@ tbody tr:hover {
   border-bottom: 3px solid transparent;
 }
 .tabs button.active {
-  border-color: #116753;
-  color: #116753;
+  border-color: #314cb7;
+  color: #314cb7;
 }
 .back-link {
   font-size: 0.875rem;
-  color: #668075;
+  color: #626f8c;
   display: inline-block;
   margin-bottom: 18px;
 }
@@ -506,13 +506,13 @@ tbody tr:hover {
   margin-bottom: 20px;
 }
 .metric {
-  border: 1px solid #e1e8e4;
+  border: 1px solid #e1e5ed;
   padding: 20px;
   border-radius: 10px;
 }
 .metric span {
   font-size: 0.875rem;
-  color: #6d8075;
+  color: #69758c;
 }
 .metric strong {
   display: block;
@@ -544,8 +544,8 @@ tbody tr:hover {
 }
 .note {
   font-size: 0.875rem;
-  color: #6d7f74;
-  background: #f3f7f4;
+  color: #5d6b86;
+  background: #f1f4fb;
   border-radius: 8px;
   padding: 12px 15px;
 }
@@ -574,7 +574,7 @@ tbody tr:hover {
   color: #ab4638;
 }
 .task-card {
-  border: 1px solid #e2e9e4;
+  border: 1px solid #e1e5ed;
   border-radius: 10px;
   padding: 20px;
   margin-bottom: 16px;
@@ -593,12 +593,12 @@ summary {
 }
 .proof {
   padding: 14px;
-  background: #f6f8f7;
+  background: #f6f7fb;
   margin: 12px 0;
   border-radius: 7px;
 }
 .evidence-line {
-  border-left: 3px solid #d6e5dc;
+  border-left: 3px solid #d3dcf5;
   padding-left: 12px;
   margin: 15px 0;
 }
@@ -641,7 +641,7 @@ summary {
     width: 100%;
     padding: 14px 20px;
     border-right: 0;
-    border-bottom: 1px solid #e2e9e5;
+    border-bottom: 1px solid #e1e5ed;
     display: block;
   }
   .sidebar .wordmark {
@@ -836,5 +836,275 @@ td,
   }
   .metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* WeCall brand: an original light-line motif, with quiet surfaces for daily work. */
+.brand-flow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 85% 45%, #283d8b88, transparent 60%),
+    radial-gradient(ellipse at 45% 100%, #38315e66, transparent 65%);
+}
+.brand-flow svg {
+  width: 100%;
+  height: 100%;
+  opacity: 0.85;
+}
+.brand-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: #0b1026;
+  color: white;
+  padding: 42px 44px;
+  margin-bottom: 38px;
+  border-radius: 4px;
+}
+.brand-hero .brand-flow {
+  left: 25%;
+}
+.hero-copy {
+  position: relative;
+  max-width: 650px;
+}
+.brand-hero .eyebrow {
+  color: #a8baff;
+  font-size: 0.68rem;
+}
+.brand-hero h2 {
+  font-size: clamp(1.9rem, 3.4vw, 3rem);
+  line-height: 1.3;
+  letter-spacing: -0.05em;
+  margin: 16px 0;
+}
+.brand-hero p:not(.eyebrow) {
+  color: #c5cde0;
+  font-size: 0.9rem;
+}
+.hero-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 0;
+  margin-top: 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #7b8ab8;
+}
+.hero-link:hover {
+  color: #b8d4ff;
+}
+.hero-index {
+  position: absolute;
+  right: 32px;
+  bottom: 25px;
+  color: #a4b1d0;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+}
+.sidebar {
+  background: #101528;
+  color: #fff;
+  border: 0;
+  width: 236px;
+  padding: 30px 20px;
+}
+.sidebar .wordmark {
+  padding-left: 12px;
+}
+.sidebar .workspace-name {
+  padding-left: 12px;
+  color: #9aa6c2;
+}
+.sidebar .nav-label {
+  color: #8997b6;
+}
+.sidebar nav a {
+  color: #b7c0d5;
+  border-radius: 5px;
+  font-size: 0.875rem;
+}
+.sidebar nav a:hover {
+  color: white;
+  background: #1d2640;
+}
+.sidebar nav a.router-link-active {
+  color: #fff;
+  background: #2a365c;
+  box-shadow: inset 3px 0 #819cff;
+}
+.sidebar-bottom {
+  border-color: #30384e;
+  color: #e2e8f8;
+}
+.sidebar-bottom small {
+  color: #a4b1d0;
+}
+.sidebar-bottom .avatar {
+  background: #2a365c;
+}
+.sidebar-bottom .icon-button {
+  color: #c9d3ee;
+  background: transparent;
+}
+.sidebar-bottom .icon-button:hover {
+  background: #2a365c;
+}
+.main-shell {
+  margin-left: 236px;
+}
+.topbar {
+  height: 76px;
+}
+.content {
+  padding: 36px 40px 64px;
+}
+.panel {
+  border-radius: 7px;
+  box-shadow: 0 3px 14px #12245103;
+}
+h1 {
+  font-size: 2.15rem;
+  font-weight: 750;
+}
+button,
+a {
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+.primary {
+  border-radius: 5px;
+}
+.login-layout {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+}
+.login-intro {
+  overflow: hidden;
+  isolation: isolate;
+  padding: 110px 10%;
+  min-height: 680px;
+}
+.login-intro > :not(.brand-flow) {
+  position: relative;
+}
+.login-intro .wordmark {
+  position: absolute;
+  top: 35px;
+}
+.login-intro .brand-flow {
+  inset: 10% -70% -5% -15%;
+  opacity: 0.6;
+}
+.login-intro h1 {
+  font-size: clamp(2.3rem, 4vw, 4.1rem);
+  line-height: 1.28;
+}
+.login-intro .eyebrow {
+  color: #a8baff;
+  font-size: 0.75rem;
+}
+.login-form {
+  max-width: 450px;
+  padding: 40px;
+}
+.login-form .primary {
+  padding: 14px;
+  margin-top: 6px;
+}
+.summary-grid > div {
+  border-top: 2px solid #dce3f4;
+  padding: 16px 0;
+}
+.summary-grid h2 {
+  font-size: 2rem;
+  margin: 12px 0 0;
+  letter-spacing: -0.04em;
+}
+@media (max-width: 1050px) {
+  .sidebar {
+    width: 200px;
+    padding: 25px 14px;
+  }
+  .main-shell {
+    margin-left: 200px;
+  }
+  .content {
+    padding: 26px;
+  }
+  .brand-hero {
+    padding: 32px;
+  }
+  .hero-index {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .sidebar {
+    width: 100%;
+    padding: 18px 16px 12px;
+  }
+  .sidebar .wordmark {
+    padding-left: 6px;
+    font-size: 1.8rem;
+  }
+  .sidebar nav {
+    gap: 4px;
+  }
+  .sidebar nav a {
+    padding: 9px 10px;
+    gap: 7px;
+    font-size: 0.8rem;
+  }
+  .sidebar nav a svg {
+    width: 16px;
+    height: 16px;
+  }
+  .main-shell {
+    margin-left: 0;
+  }
+  .topbar {
+    height: 48px;
+  }
+  .content {
+    padding: 22px 16px 40px;
+  }
+  .brand-hero {
+    padding: 28px 24px;
+    margin-bottom: 28px;
+  }
+  .brand-hero .brand-flow {
+    left: 0;
+    opacity: 0.55;
+  }
+  .brand-hero h2 {
+    font-size: 1.9rem;
+  }
+  .brand-hero p:not(.eyebrow) {
+    font-size: 0.8rem;
+  }
+  h1 {
+    font-size: 1.75rem;
+  }
+  .login-intro {
+    min-height: 0;
+    padding: 95px 28px 30px;
+  }
+  .login-intro h1 {
+    font-size: 2.3rem;
+  }
+  .login-form {
+    padding: 32px 26px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  button,
+  a {
+    transition: none;
   }
 }
