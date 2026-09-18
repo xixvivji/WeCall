@@ -31,6 +31,8 @@
 
 백엔드 131개, 프론트 31개(계산·입력 단위 3개와 브라우저 28개), Python 계약·평가 35개 통과. 프론트 타입 검사·빌드와 backend bootJar 빌드 통과. 실제 Spring→FastAPI→Ollama 업무와 별도 종료·재개 HTTP 검증 통과.
 
+구현 커밋 `f0d2d37`의 [GitHub CI](https://github.com/xixvivji/WeCall/actions/runs/35315350477)도 백엔드·AI 계약·프론트 빌드·브라우저 및 HTTP 업무 검사를 통과했다. 실제 모델 35건 평가는 CI와 별도로 로컬에서 수행했다.
+
 ## 실제 모델 회귀
 
 Ollama 0.34.0, qwen3:4b-instruct ID `0edcdef34593`, local-extract-v2, Apple M5. 기존 자료와 정답·모델·프롬프트를 변경하지 않았다. 이제 holdout도 재실행한 회귀 세트이며 새 독립 평가가 아니다.
