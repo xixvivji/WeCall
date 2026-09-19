@@ -15,6 +15,10 @@ const taskStatus = ref<"OPEN" | "IN_PROGRESS" | "PROOF" | "COMPLETED">("OPEN");
 const resetRequested = ref(false),
   finished = ref(false);
 const heading = ref<HTMLElement>();
+function startExperience() {
+  heading.value?.scrollIntoView({ block: "center", behavior: "auto" });
+  heading.value?.focus({ preventScroll: true });
+}
 const steps = [
   "원문 확인",
   "AI 초안",
@@ -100,20 +104,38 @@ function reset() {
         >wecall<span class="brand-dot">.</span></RouterLink
       >
       <span class="demo-label"><ShieldCheck :size="16" /> 합성 샘플 체험</span>
-      <RouterLink to="/" class="demo-login">업무 화면으로 →</RouterLink>
+      <nav class="demo-topnav" aria-label="서비스 메뉴">
+        <button @click="startExperience">
+          서비스 체험 <ArrowRight :size="16" />
+        </button>
+        <RouterLink to="/" class="demo-login">업무 화면으로 →</RouterLink>
+      </nav>
     </header>
+    <section class="brand-hero demo-hero" aria-label="WeCall 소개">
+      <BrandFlow />
+      <div class="hero-copy">
+        <p class="eyebrow">CONNECTED RECALL OPERATIONS</p>
+        <h1>확실한 근거로,<br />끝까지 연결하다.</h1>
+        <p>
+          회수 요청부터 영향 확인과 대응까지.<br class="mobile-break" />
+          WeCall로 하나의 흐름으로.
+        </p>
+        <button class="demo-hero-cta" @click="startExperience">
+          샘플 체험 시작 <ArrowRight :size="20" />
+        </button>
+      </div>
+      <div class="demo-hero-index" aria-label="서비스 핵심 흐름">
+        <span><small>01</small> 원문에서 근거로</span>
+        <span><small>02</small> 근거에서 판단으로</span>
+        <span><small>03</small> 판단에서 대응으로</span>
+      </div>
+    </section>
     <main class="demo-main">
-      <section class="brand-hero demo-hero">
-        <BrandFlow />
-        <div class="hero-copy">
-          <p class="eyebrow">FROM NOTICE TO RESPONSE</p>
-          <h1>하나의 회수 요청,<br />끝까지 따라가 보세요.</h1>
-          <p>
-            가상 크래커 회수 사건으로 원문·조건·재고·대응이 연결되는 과정을
-            체험합니다.
-          </p>
-        </div>
-      </section>
+      <div class="demo-section-title">
+        <p class="eyebrow">EXPERIENCE WECALL</p>
+        <h2>회수 업무의 흐름을<br />직접 확인해 보세요.</h2>
+        <p>가상 크래커 회수 사건으로 알아보는 6단계 업무 체험</p>
+      </div>
       <div class="demo-boundary" role="note">
         <ShieldCheck :size="20" />
         <p>
@@ -471,10 +493,15 @@ function reset() {
 <style scoped>
 .demo-page {
   min-height: 100vh;
+  background: white;
+  position: relative;
 }
 .demo-header {
-  padding: 20px max(24px, calc((100% - 1180px) / 2));
-  background: #101528;
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  padding: 26px 5%;
+  background: transparent;
   color: white;
   display: flex;
   align-items: center;
@@ -488,7 +515,9 @@ function reset() {
   font-size: 0.8rem;
 }
 .demo-login {
-  margin-left: auto;
+  border-radius: 30px;
+  padding: 9px 20px;
+  background: #ffffff24;
   font-size: 0.85rem;
 }
 .demo-main {
@@ -496,11 +525,90 @@ function reset() {
   margin: auto;
   padding: 32px 24px 60px;
 }
+.demo-topnav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 36px;
+}
+.demo-topnav button {
+  border: 0;
+  background: transparent;
+  color: white;
+  padding: 8px 0;
+}
 .demo-hero {
-  margin-bottom: 22px;
+  min-height: min(850px, 100svh);
+  padding: 200px 5% 140px;
+  margin: 0;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  background: #070914;
+}
+.demo-hero :deep(.brand-flow) {
+  left: 0;
+  opacity: 1;
+}
+.demo-hero .hero-copy {
+  max-width: 850px;
+}
+.demo-hero .hero-copy > p:not(.eyebrow) {
+  font-size: 1.15rem;
+  color: #e0e4f2;
+  margin-top: 28px;
+}
+.demo-hero-cta {
+  color: white;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #ffffff66;
+  border-radius: 0;
+  padding: 16px 0;
+  margin-top: 52px;
+  gap: 56px;
+}
+.demo-hero-cta:hover {
+  color: #b7dcff;
+  background: transparent;
+}
+.demo-hero-index {
+  position: absolute;
+  bottom: 42px;
+  left: 5%;
+  right: 5%;
+  display: flex;
+  justify-content: center;
+  gap: 56px;
+  border-top: 1px solid #ffffff25;
+  padding-top: 24px;
+}
+.demo-hero-index span {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+.demo-hero-index small {
+  color: #8f9cb9;
+  font-weight: 400;
+}
+.demo-section-title {
+  padding: 68px 0 26px;
+}
+.demo-section-title h2 {
+  font-size: clamp(2rem, 3.7vw, 3rem);
+  line-height: 1.3;
+  letter-spacing: -0.05em;
+}
+.demo-section-title > p:last-child {
+  color: #697186;
+}
+.mobile-break {
+  display: none;
 }
 .demo-hero h1 {
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(2.8rem, 5vw, 5rem);
   line-height: 1.3;
   margin: 16px 0;
 }
@@ -647,8 +755,42 @@ li {
   }
 }
 @media (max-width: 600px) {
+  .demo-topnav {
+    gap: 12px;
+  }
+  .demo-topnav button,
+  .demo-label {
+    display: none;
+  }
+  .demo-hero {
+    min-height: 640px;
+    padding: 150px 24px 160px;
+  }
+  .demo-hero h1 {
+    font-size: 2.65rem;
+  }
+  .demo-hero .hero-copy > p:not(.eyebrow) {
+    font-size: 0.95rem;
+  }
+  .demo-hero-index {
+    left: 24px;
+    right: 24px;
+    gap: 14px;
+    justify-content: space-between;
+  }
+  .demo-hero-index span {
+    flex-direction: column;
+    gap: 5px;
+    font-size: 0.68rem;
+  }
+  .demo-section-title {
+    padding-top: 32px;
+  }
+  .mobile-break {
+    display: initial;
+  }
   .demo-header {
-    padding: 16px;
+    padding: 20px 24px;
     flex-wrap: wrap;
     gap: 12px;
   }
