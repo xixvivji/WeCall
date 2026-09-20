@@ -2,6 +2,7 @@
 import asyncio
 import hashlib
 import json
+import os
 import re
 from datetime import date
 from typing import Literal
@@ -17,7 +18,7 @@ PROMPT_VERSION = "local-extract-v2"
 BASE_URL = "http://127.0.0.1:11434"
 MAX_SOURCE_BYTES = 6000
 MAX_RESPONSE_BYTES = 65536
-DEADLINE_SECONDS = 90
+DEADLINE_SECONDS = max(30, min(300, int(os.environ.get("WECALL_AI_DEADLINE_SECONDS", "90"))))
 # No queue: several callers must not multiply local model memory use.
 _busy = False
 
@@ -174,7 +175,7 @@ class LocalProvider:
         _busy = True
         try:
             async with asyncio.timeout(DEADLINE_SECONDS):
-                async with httpx.AsyncClient(trust_env=False, follow_redirects=False, timeout=httpx.Timeout(80, connect=2)) as client:
+                async with httpx.AsyncClient(trust_env=False, follow_redirects=False, timeout=httpx.Timeout(DEADLINE_SECONDS, connect=2)) as client:
                     info = await read_json(client, "/api/show", {"model": MODEL})
                     if not isinstance(info, dict):
                         fail("INVALID_MODEL_OUTPUT")

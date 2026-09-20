@@ -38,7 +38,10 @@ def main():
     parser.add_argument("--with-tasks", action="store_true", help="Assign a response task, review proof and complete it")
     parser.add_argument("--with-extraction", action="store_true", help="Use explicitly enabled FastAPI fixture extraction")
     parser.add_argument("--with-live-extraction", action="store_true", help="Evaluate the configured local model using synthetic data only")
+    parser.add_argument("--extraction-wait-seconds", type=int, default=110, help="Maximum live extraction polling wait")
     args = parser.parse_args()
+    if not 1 <= args.extraction_wait_seconds <= 600:
+        parser.error("Extraction wait must be between 1 and 600 seconds")
     if args.with_extraction and args.with_live_extraction:
         parser.error("Choose fixture or local live extraction, not both")
     base = args.base_url.rstrip("/")
@@ -62,7 +65,7 @@ def main():
     extraction = None
     if args.with_extraction or args.with_live_extraction:
         extraction = request(prefix + "/extractions", {}, expected=202)
-        deadline = time.monotonic() + (110 if args.with_live_extraction else 30)
+        deadline = time.monotonic() + (args.extraction_wait_seconds if args.with_live_extraction else 30)
         while extraction["status"] in ("QUEUED", "RUNNING") and time.monotonic() < deadline:
             time.sleep(0.25)
             extraction = request(prefix + f'/extractions/{extraction["id"]}')
