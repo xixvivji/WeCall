@@ -32,6 +32,7 @@ services:
     restart: unless-stopped
     environment:
       WECALL_AI_PROVIDER: ollama-local
+      WECALL_AI_DEADLINE_SECONDS: "300"
       WECALL_AI_SERVICE_TOKEN: ${WECALL_AI_SERVICE_TOKEN:?required}
     depends_on: [ollama]
     mem_limit: 1g
@@ -47,7 +48,7 @@ services:
       DB_URL: jdbc:postgresql://127.0.0.1:5432/wecall
       DB_USERNAME: wecall
       WECALL_AI_BASE_URL: http://127.0.0.1:8000
-      WECALL_AI_READ_TIMEOUT_MS: "100000"
+      WECALL_AI_READ_TIMEOUT_MS: "310000"
       WECALL_AI_ALLOW_MOCK: "false"
       WECALL_ATTACHMENT_DIR: /data/attachments
     volumes: ["attachments:/data/attachments"]
