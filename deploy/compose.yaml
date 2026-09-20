@@ -1,0 +1,71 @@
+name: wecall-demo
+services:
+  postgres:
+    image: postgres:17.6
+    restart: unless-stopped
+    ports: ["127.0.0.1:5432:5432"]
+    environment:
+      POSTGRES_DB: wecall
+      POSTGRES_USER: wecall
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?required}
+    volumes: ["postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wecall -d wecall"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  ollama:
+    image: ollama/ollama:0.34.0
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 127.0.0.1:11434
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_KEEP_ALIVE: 24h
+    volumes: ["models:/root/.ollama"]
+    mem_limit: 8g
+  ai:
+    build: {context: .., dockerfile: deploy/ai.Dockerfile}
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      WECALL_AI_PROVIDER: ollama-local
+      WECALL_AI_SERVICE_TOKEN: ${WECALL_AI_SERVICE_TOKEN:?required}
+    depends_on: [ollama]
+    mem_limit: 1g
+  backend:
+    build: {context: .., dockerfile: deploy/backend.Dockerfile}
+    network_mode: host
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SERVER_ADDRESS: 127.0.0.1
+      SESSION_COOKIE_SECURE: "true"
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      DB_URL: jdbc:postgresql://127.0.0.1:5432/wecall
+      DB_USERNAME: wecall
+      WECALL_AI_BASE_URL: http://127.0.0.1:8000
+      WECALL_AI_READ_TIMEOUT_MS: "100000"
+      WECALL_AI_ALLOW_MOCK: "false"
+      WECALL_ATTACHMENT_DIR: /data/attachments
+    volumes: ["attachments:/data/attachments"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      ai: {condition: service_started}
+    mem_limit: 3g
+  web:
+    build: {context: .., dockerfile: deploy/web.Dockerfile}
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?required}
+    volumes: ["caddy:/data", "caddy_config:/config"]
+    depends_on: [backend]
+volumes:
+  postgres:
+  attachments:
+  models:
+  caddy:
+  caddy_config:
